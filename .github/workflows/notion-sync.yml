@@ -1,0 +1,163 @@
+
+name: Sync commits to Notion
+
+on:
+  push:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Sync GitHub commits
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATA_SOURCE_ID: ${{ secrets.NOTION_DATA_SOURCE_ID }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          cat > /tmp/sync_notion.py <<'PY'
+          import os
+          import json
+          import urllib.request
+          import urllib.error
+          import time
+
+          notion_token = os.environ["NOTION_TOKEN"]
+          source_id = os.environ["NOTION_DATA_SOURCE_ID"]
+          repo = os.environ["GITHUB_REPOSITORY"]
+          branch = os.environ["GITHUB_REF_NAME"]
+          before = os.environ["GITHUB_EVENT_BEFORE"]
+          after = os.environ["GITHUB_SHA"]
+          github_token = os.environ["GITHUB_TOKEN"]
+
+          stack = repo.rsplit("_", 1)[-1].upper()
+          if stack not in ("FE", "BE", "AI"):
+              raise ValueError(f"Unknown stack: {stack}")
+
+          notion_headers = {
+              "Authorization": f"Bearer {notion_token}",
+              "Notion-Version": "2025-09-03",
+              "Content-Type": "application/json"
+          }
+
+          def request(url, method="GET", data=None, headers=None):
+              payload = json.dumps(data).encode() if data is not None else None
+              req = urllib.request.Request(
+                  url, data=payload, headers=headers or {},
+                  method=method
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as response:
+                      return json.load(response)
+              except urllib.error.HTTPError as exc:
+                  print(f"HTTP {exc.code}: {exc.read().decode()[:1000]}")
+                  raise
+
+          github_headers = {
+              "Authorization": f"Bearer {github_token}",
+              "Accept": "application/vnd.github+json",
+              "User-Agent": "notion-commit-sync"
+          }
+
+          def commits_from_push():
+              if before == "0" * 40:
+                  # New branch: record the head commit only.
+                  return [request(
+                      f"https://api.github.com/repos/{repo}/commits/{after}",
+                      headers=github_headers
+                  )]
+
+              url = (
+                  f"https://api.github.com/repos/{repo}/compare/"
+                  f"{before}...{after}?per_page=100"
+              )
+              result = request(url, headers=github_headers)
+              if result.get("total_commits", 0) > 100:
+                  raise RuntimeError(
+                      "More than 100 commits in one push; "
+                      "pagination is required."
+                  )
+              return result.get("commits", [])
+
+          def already_exists(sha):
+              cursor = None
+              while True:
+                  body = {
+                      "filter": {
+                          "property": "Commit SHA",
+                          "rich_text": {"equals": sha}
+                      },
+                      "page_size": 100
+                  }
+                  if cursor:
+                      body["start_cursor"] = cursor
+
+                  result = request(
+                      f"https://api.notion.com/v1/data_sources/{source_id}/query",
+                      "POST", body, notion_headers
+                  )
+                  if result.get("results"):
+                      return True
+                  if not result.get("has_more"):
+                      return False
+                  cursor = result["next_cursor"]
+
+          def rich_text(value):
+              return [{"text": {"content": str(value)[:2000]}}]
+
+          for commit in commits_from_push():
+              sha = commit["sha"]
+              if already_exists(sha):
+                  print(f"Skipped duplicate: {sha[:7]}")
+                  continue
+
+              info = commit["commit"]
+              author = commit.get("author") or {}
+              author_name = (
+                  author.get("login")
+                  or info.get("author", {}).get("name")
+                  or "Unknown"
+              )
+              date = info["author"]["date"]
+
+              body = {
+                  "parent": {
+                      "type": "data_source_id",
+                      "data_source_id": source_id
+                  },
+                  "properties": {
+                      "Commit Message": {
+                          "title": rich_text(info["message"][:2000])
+                      },
+                      "Author": {
+                          "rich_text": rich_text(author_name)
+                      },
+                      "Date": {"date": {"start": date}},
+                      "Stack": {"select": {"name": stack}},
+                      "Branch": {
+                          "rich_text": rich_text(branch)
+                      },
+                      "Commit URL": {
+                          "url": commit["html_url"]
+                      },
+                      "Commit SHA": {
+                          "rich_text": rich_text(sha)
+                      }
+                  }
+              }
+
+              request(
+                  "https://api.notion.com/v1/pages",
+                  "POST", body, notion_headers
+              )
+              print(f"Created: {stack} {sha[:7]}")
+              time.sleep(0.4)
+          PY
+
+          python /tmp/sync_notion.py
