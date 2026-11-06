@@ -47,16 +47,24 @@ jobs:
           }
 
           def request(url, method="GET", data=None, headers=None):
-              payload = json.dumps(data).encode() if data is not None else None
+              payload = (
+                  json.dumps(data).encode("utf-8")
+                  if data is not None else None
+              )
               req = urllib.request.Request(
-                  url, data=payload, headers=headers or {},
+                  url,
+                  data=payload,
+                  headers=headers or {},
                   method=method
               )
               try:
                   with urllib.request.urlopen(req, timeout=30) as response:
                       return json.load(response)
               except urllib.error.HTTPError as exc:
-                  print(f"HTTP {exc.code}: {exc.read().decode()[:1000]}")
+                  print(
+                      f"HTTP {exc.code}: "
+                      f"{exc.read().decode('utf-8')[:1000]}"
+                  )
                   raise
 
           github_headers = {
@@ -78,15 +86,18 @@ jobs:
                   f"{before}...{after}?per_page=100"
               )
               result = request(url, headers=github_headers)
+
               if result.get("total_commits", 0) > 100:
                   raise RuntimeError(
                       "More than 100 commits in one push; "
                       "pagination is required."
                   )
+
               return result.get("commits", [])
 
           def already_exists(sha):
               cursor = None
+
               while True:
                   body = {
                       "filter": {
@@ -95,35 +106,59 @@ jobs:
                       },
                       "page_size": 100
                   }
+
                   if cursor:
                       body["start_cursor"] = cursor
 
                   result = request(
                       f"https://api.notion.com/v1/data_sources/{source_id}/query",
-                      "POST", body, notion_headers
+                      "POST",
+                      body,
+                      notion_headers
                   )
+
                   if result.get("results"):
                       return True
+
                   if not result.get("has_more"):
                       return False
+
                   cursor = result["next_cursor"]
 
           def rich_text(value):
-              return [{"text": {"content": str(value)[:2000]}}]
+              return [{
+                  "text": {
+                      "content": str(value)[:2000]
+                  }
+              }]
 
           for commit in commits_from_push():
               sha = commit["sha"]
+
               if already_exists(sha):
                   print(f"Skipped duplicate: {sha[:7]}")
                   continue
 
               info = commit["commit"]
+
+              # Split commit title and description.
+              full_message = info["message"]
+              parts = full_message.split("\n", 1)
+
+              commit_title = parts[0].strip()
+              commit_description = (
+                  parts[1].strip()
+                  if len(parts) > 1
+                  else ""
+              )
+
               author = commit.get("author") or {}
               author_name = (
                   author.get("login")
                   or info.get("author", {}).get("name")
                   or "Unknown"
               )
+
               date = info["author"]["date"]
 
               body = {
@@ -133,13 +168,26 @@ jobs:
                   },
                   "properties": {
                       "Commit Message": {
-                          "title": rich_text(info["message"][:2000])
+                          "title": rich_text(commit_title)
+                      },
+                      "Description": {
+                          "rich_text": rich_text(
+                              commit_description
+                          )
                       },
                       "Author": {
                           "rich_text": rich_text(author_name)
                       },
-                      "Date": {"date": {"start": date}},
-                      "Stack": {"select": {"name": stack}},
+                      "Date": {
+                          "date": {
+                              "start": date
+                          }
+                      },
+                      "Stack": {
+                          "select": {
+                              "name": stack
+                          }
+                      },
                       "Branch": {
                           "rich_text": rich_text(branch)
                       },
@@ -154,8 +202,11 @@ jobs:
 
               request(
                   "https://api.notion.com/v1/pages",
-                  "POST", body, notion_headers
+                  "POST",
+                  body,
+                  notion_headers
               )
+
               print(f"Created: {stack} {sha[:7]}")
               time.sleep(0.4)
           PY
