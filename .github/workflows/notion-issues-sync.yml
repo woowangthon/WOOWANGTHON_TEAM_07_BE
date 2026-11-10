@@ -3,11 +3,15 @@ name: Sync GitHub Issues to Notion Tasks
 
 on:
   issues:
-    types: [opened]
+    types: [opened, edited, labeled, unlabeled]
 
 permissions:
   contents: read
   issues: read
+
+concurrency:
+  group: notion-issue-${{ github.repository }}-${{ github.event.issue.number }}
+  cancel-in-progress: false
 
 jobs:
   sync-issue:
@@ -18,9 +22,8 @@ jobs:
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_TASKS_DATA_SOURCE_ID: ${{ secrets.NOTION_TASKS_DATA_SOURCE_ID }}
-          ISSUE_TITLE: ${{ github.event.issue.title }}
-          ISSUE_BODY: ${{ github.event.issue.body }}
-          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_JSON: ${{ toJSON(github.event.issue) }}
+          ISSUE_ACTION: ${{ github.event.action }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           cat > /tmp/sync_issue.py <<'PY'
@@ -31,17 +34,34 @@ jobs:
 
           token = os.environ["NOTION_TOKEN"]
           source_id = os.environ["NOTION_TASKS_DATA_SOURCE_ID"]
-          issue_title = os.environ["ISSUE_TITLE"]
-          issue_body = os.environ.get("ISSUE_BODY", "")
-          issue_url = os.environ["ISSUE_URL"]
+          issue = json.loads(os.environ["ISSUE_JSON"])
+          action = os.environ["ISSUE_ACTION"]
           repo = os.environ["GITHUB_REPOSITORY"]
 
+          title = issue["title"]
+          description = issue.get("body") or ""
+          issue_url = issue["html_url"]
+
           stack = repo.rsplit("_", 1)[-1].upper()
-
           if stack not in ("FE", "BE", "AI"):
-              raise ValueError(f"Unknown stack: {stack}")
+              raise ValueError(f"Invalid stack: {stack}")
 
-          notion_headers = {
+          # GitHub labels -> Notion task type
+          labels = {
+              label["name"].strip().lower()
+              for label in issue.get("labels", [])
+          }
+
+          if "bug" in labels:
+              task_type = "Bug"
+          elif "feature" in labels:
+              task_type = "Feature"
+          elif "docs" in labels:
+              task_type = "Docs"
+          else:
+              task_type = "Task"
+
+          headers = {
               "Authorization": f"Bearer {token}",
               "Notion-Version": "2025-09-03",
               "Content-Type": "application/json"
@@ -49,119 +69,98 @@ jobs:
 
           def notion_request(url, method="GET", data=None):
               payload = (
-                  json.dumps(
-                      data,
-                      ensure_ascii=False
-                  ).encode("utf-8")
+                  json.dumps(data, ensure_ascii=False).encode("utf-8")
                   if data is not None else None
               )
 
               req = urllib.request.Request(
                   url,
                   data=payload,
-                  headers=notion_headers,
+                  headers=headers,
                   method=method
               )
 
               try:
-                  with urllib.request.urlopen(
-                      req,
-                      timeout=30
-                  ) as response:
-                      return json.load(response)
-
+                  with urllib.request.urlopen(req, timeout=30) as res:
+                      return json.load(res)
               except urllib.error.HTTPError as exc:
                   error = exc.read().decode("utf-8")
-                  print(
-                      f"Notion API error {exc.code}: "
-                      f"{error[:1500]}"
-                  )
+                  print(f"Notion API error {exc.code}: {error[:1200]}")
                   raise
 
           def rich_text(value):
               value = str(value or "")
-
-              if not value:
-                  return []
-
               return [
                   {
                       "type": "text",
-                      "text": {
-                          "content": value[i:i + 1800]
-                      }
+                      "text": {"content": value[i:i + 1800]}
                   }
                   for i in range(0, len(value), 1800)
               ][:100]
 
-          def task_exists():
-              body = {
-                  "filter": {
-                      "property": "Github Issue",
-                      "url": {
-                          "equals": issue_url
-                      }
-                  },
-                  "page_size": 1
-              }
-
+          def find_task():
               result = notion_request(
                   f"https://api.notion.com/v1/data_sources/{source_id}/query",
                   "POST",
-                  body
-              )
-
-              return bool(result.get("results"))
-
-          def create_task():
-              body = {
-                  "parent": {
-                      "type": "data_source_id",
-                      "data_source_id": source_id
-                  },
-                  "properties": {
-                      "업무명": {
-                          "title": rich_text(issue_title)
+                  {
+                      "filter": {
+                          "property": "Github Issue",
+                          "url": {"equals": issue_url}
                       },
-                      "Description": {
-                          "rich_text": rich_text(issue_body)
-                      },
-                      "Github Issue": {
-                          "url": issue_url
-                      },
-                      "담당 분야": {
-                          "select": {
-                              "name": stack
-                          }
-                      },
-                      "상태": {
-                          "status": {
-                              "name": "Not started"
-                          }
-                      }
+                      "page_size": 1
                   }
+              )
+              results = result.get("results", [])
+              return results[0] if results else None
+
+          properties = {
+              "업무명": {
+                  "title": rich_text(title)
+              },
+              "Description": {
+                  "rich_text": rich_text(description)
+              },
+              "Github Issue": {
+                  "url": issue_url
+              },
+              "담당 분야": {
+                  "select": {"name": stack}
+              },
+              "업무 유형": {
+                  "select": {"name": task_type}
+              }
+          }
+
+          task = find_task()
+
+          if task:
+              notion_request(
+                  f"https://api.notion.com/v1/pages/{task['id']}",
+                  "PATCH",
+                  {"properties": properties}
+              )
+              print(f"Updated task: {issue_url} [{task_type}]")
+
+          elif action == "opened":
+              properties["상태"] = {
+                  "status": {"name": "Not started"}
               }
 
               result = notion_request(
                   "https://api.notion.com/v1/pages",
                   "POST",
-                  body
+                  {
+                      "parent": {
+                          "type": "data_source_id",
+                          "data_source_id": source_id
+                      },
+                      "properties": properties
+                  }
               )
+              print(f"Created task: {result['id']} [{task_type}]")
 
-              return result["id"]
-
-          if task_exists():
-              print(
-                  f"Task already exists: {issue_url}"
-              )
           else:
-              task_id = create_task()
-
-              print(
-                  f"Created Notion Task: "
-                  f"{issue_title} ({stack})"
-              )
-              print(f"Notion Task ID: {task_id}")
+              print("Matching task not found. No changes made.")
           PY
 
           python /tmp/sync_issue.py
