@@ -1,0 +1,106 @@
+review_type,codes,proposed_station_name,status,note
+TRANSFER_CANDIDATE,0150|0426,서울역,CONFIRMED,수동 확정(2026-11-13 사용자 승인). 근거: (1) OA-13290(2025.03.31) 공식 환승 기록이 양방향으로 있고 거리·시간이 같음(1호선↔4호선 159m 02:13) (2) OA-12035 지번주소에 '서울역(n호선)' 표기가 있음. 시드 역명(1호선 서울 / 4호선 서울)과 공식 역명(서울역)이 달라 이름 규칙으로 연결되지 않아 이 그룹만 명시적으로 확정함. 역명만으로 병합하는 일반 규칙이 아님. 노선별 시드 원본 역명은 stations_oa12035.csv에 그대로 보존됨. 근거는 transfer_evidence_oa13290.csv(name_match=manual).
+TRANSFER_CANDIDATE,0151|0201,시청,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0153|0319|2535,종로3가,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 3개 노선 3쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=base+exact. 근거는 transfer_evidence_oa13290.csv. 역명 동일 후보를 확장·교체한 그룹. 노선별 역명 표기가 달라 공통 이름(괄호 부연 제외)을 표시명으로 지정
+TRANSFER_CANDIDATE,0155|0421,동대문,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0156|0246,신설동,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0159|2637,동묘앞,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0203|0320,을지로3가,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0204|2536,을지로4가,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0205|0422|2537,동대문역사문화공원(DDP),CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 3개 노선 3쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=base. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0206|2636,신당,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0208|2541,왕십리(성동구청),CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=base. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0212|2729,건대입구,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0216|2815,잠실(송파구청),CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=base. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0223|0330,"교대(법원, 검찰청)",CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=base. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0226|0433,사당,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0233|2746,대림(구로구청),CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=base. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0236|2524,영등포구청,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0238|2623,합정,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0243|2532,충정로(경기대입구),CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=base. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0311|2615,연신내,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0312|2613,불광,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0321|0423,충무로,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0323|2634,약수,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0329|2736,고속터미널,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0340|2818,가락시장,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0342|2558,오금,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0411|2715,노원,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,0428|2629,삼각지,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=base+exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치. 노선별 역명 표기가 달라 공통 이름(괄호 부연 제외)을 표시명으로 지정
+TRANSFER_CANDIDATE,0432|2738,총신대입구(이수),CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=base+exact. 근거는 transfer_evidence_oa13290.csv. 역명 동일 후보에 없던 그룹. 통합 표시명은 사용자 지정(2026-11-13). 노선별 원본 역명은 stations_oa12035.csv에 보존됨: 4호선 총신대입구(이수) / 7호선 이수
+TRANSFER_CANDIDATE,2530|2627,공덕,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,2538|2635,청구,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,2545|2727,군자(능동),CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=base. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,2548|2812,천호(풍납토성),CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=base. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+TRANSFER_CANDIDATE,2646|2719,태릉입구,CONFIRMED,OA-13290(2025.03.31) 공식 환승 기록으로 확인: 2개 노선 1쌍 모두 양방향 기록·거리·시간 일치. 역명 해석=exact. 근거는 transfer_evidence_oa13290.csv. 후보 목록(역명·주소 기반)과 일치.
+NAME_VARIANT,0150,,PENDING,표기가 다름. 확인 필요. OA-15994=서울역(1) / OA-12035=서울
+NAME_VARIANT,0158,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=청량리(1) / OA-12035=청량리(서울시립대입구)
+NAME_VARIANT,0205,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=동대문역사문화공원(2) / OA-12035=동대문역사문화공원(DDP)
+NAME_VARIANT,0208,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=왕십리(2) / OA-12035=왕십리(성동구청)
+NAME_VARIANT,0213,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=구의 / OA-12035=구의(광진구청)
+NAME_VARIANT,0214,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=강변 / OA-12035=강변(동서울터미널)
+NAME_VARIANT,0216,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=잠실(2) / OA-12035=잠실(송파구청)
+NAME_VARIANT,0219,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=삼성 / OA-12035=삼성(무역센터)
+NAME_VARIANT,0223,,ACCEPTED_BY_CODE,"시드 역명에 괄호 부연이 붙음. OA-15994=교대(2) / OA-12035=교대(법원, 검찰청)"
+NAME_VARIANT,0227,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=낙성대 / OA-12035=낙성대(강감찬)
+NAME_VARIANT,0228,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=서울대입구 / OA-12035=서울대입구(관악구청)
+NAME_VARIANT,0233,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=대림(2) / OA-12035=대림(구로구청)
+NAME_VARIANT,0240,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=신촌 / OA-12035=신촌(지하)
+NAME_VARIANT,0243,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=충정로(2) / OA-12035=충정로(경기대입구)
+NAME_VARIANT,0250,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=용두 / OA-12035=용두(동대문구청)
+NAME_VARIANT,0317,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=경복궁 / OA-12035=경복궁(정부서울청사)
+NAME_VARIANT,0330,,ACCEPTED_BY_CODE,"시드 역명에 괄호 부연이 붙음. OA-15994=교대(3) / OA-12035=교대(법원, 검찰청)"
+NAME_VARIANT,0331,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=남부터미널 / OA-12035=남부터미널(예술의전당)
+NAME_VARIANT,0332,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=양재(3) / OA-12035=양재(서초구청)
+NAME_VARIANT,0414,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=수유 / OA-12035=수유(강북구청)
+NAME_VARIANT,0415,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=미아 / OA-12035=미아(서울사이버대학)
+NAME_VARIANT,0416,,ACCEPTED_BY_CODE,원본 역명에 앞뒤 공백이 있었음('미아사거리 '). 공백만 제거. OA-15994=미아사거리
+NAME_VARIANT,0418,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=성신여대입구(4) / OA-12035=성신여대입구(돈암)
+NAME_VARIANT,0419,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=한성대입구 / OA-12035=한성대입구(삼선교)
+NAME_VARIANT,0422,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=동대문역사문화공원(4) / OA-12035=동대문역사문화공원(DDP)
+NAME_VARIANT,0425,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=회현 / OA-12035=회현(남대문시장)
+NAME_VARIANT,0426,,PENDING,표기가 다름. 확인 필요. OA-15994=서울역(4) / OA-12035=서울
+NAME_VARIANT,0427,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=숙대입구 / OA-12035=숙대입구(갈월)
+NAME_VARIANT,0430,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=이촌(4) / OA-12035=이촌(국립중앙박물관)
+NAME_VARIANT,0431,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=동작(4) / OA-12035=동작(현충원)
+NAME_VARIANT,0432,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=총신대입구(4) / OA-12035=총신대입구(이수)
+NAME_VARIANT,2520,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=신정 / OA-12035=신정(은행정)
+NAME_VARIANT,2522,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=오목교 / OA-12035=오목교(목동운동장앞)
+NAME_VARIANT,2532,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=충정로(5) / OA-12035=충정로(경기대입구)
+NAME_VARIANT,2534,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=광화문 / OA-12035=광화문(세종문화회관)
+NAME_VARIANT,2535,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=종로3가(5) / OA-12035=종로3가(탑골공원)
+NAME_VARIANT,2537,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=동대문역사문화공원(5) / OA-12035=동대문역사문화공원(DDP)
+NAME_VARIANT,2541,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=왕십리(5) / OA-12035=왕십리(성동구청)
+NAME_VARIANT,2545,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=군자(5) / OA-12035=군자(능동)
+NAME_VARIANT,2546,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=아차산 / OA-12035=아차산(어린이대공원후문)
+NAME_VARIANT,2547,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=광나루 / OA-12035=광나루(장신대)
+NAME_VARIANT,2548,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=천호(5) / OA-12035=천호(풍납토성)
+NAME_VARIANT,2551,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=굽은다리 / OA-12035=굽은다리(강동구민회관앞)
+NAME_VARIANT,2556,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=올림픽공원(5) / OA-12035=올림픽공원(한국체대)
+NAME_VARIANT,2565,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=하남시청 / OA-12035=하남시청(덕풍.신장)
+NAME_VARIANT,2617,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=새절 / OA-12035=새절(신사)
+NAME_VARIANT,2618,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=증산 / OA-12035=증산(명지대앞)
+NAME_VARIANT,2620,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=월드컵경기장 / OA-12035=월드컵경기장(성산)
+NAME_VARIANT,2625,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=광흥창 / OA-12035=광흥창(서강)
+NAME_VARIANT,2626,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=대흥 / OA-12035=대흥(서강대앞)
+NAME_VARIANT,2629,,PENDING,표기가 다름. 확인 필요. OA-15994=삼각지(전쟁기념관)(6) / OA-12035=삼각지
+NAME_VARIANT,2630,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=녹사평 / OA-12035=녹사평(용산구청)
+NAME_VARIANT,2640,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=안암 / OA-12035=안암(고대병원앞)
+NAME_VARIANT,2641,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=고려대 / OA-12035=고려대(종암)
+NAME_VARIANT,2642,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=월곡 / OA-12035=월곡(동덕여대)
+NAME_VARIANT,2643,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=상월곡 / OA-12035=상월곡(한국과학기술연구원)
+NAME_VARIANT,2647,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=화랑대 / OA-12035=화랑대(서울여대입구)
+NAME_VARIANT,2648,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=봉화산 / OA-12035=봉화산(서울의료원)
+NAME_VARIANT,2718,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=공릉 / OA-12035=공릉(서울과학기술대)
+NAME_VARIANT,2725,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=용마산 / OA-12035=용마산(용마폭포공원)
+NAME_VARIANT,2727,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=군자(7) / OA-12035=군자(능동)
+NAME_VARIANT,2728,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=어린이대공원 / OA-12035=어린이대공원(세종대)
+NAME_VARIANT,2730,,PENDING,표기가 다름. 확인 필요. OA-15994=자양(뚝섬한강공원) / OA-12035=자양
+NAME_VARIANT,2740,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=숭실대입구 / OA-12035=숭실대입구(살피재)
+NAME_VARIANT,2746,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=대림(7) / OA-12035=대림(구로구청)
+NAME_VARIANT,2752,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=온수(7) / OA-12035=온수(성공회대입구)
+NAME_VARIANT,2810,,PENDING,표기가 다름. 확인 필요. OA-15994=암사역사공원 / OA-12035=암사역사공원역
+NAME_VARIANT,2812,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=천호(8) / OA-12035=천호(풍납토성)
+NAME_VARIANT,2814,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=몽촌토성 / OA-12035=몽촌토성(평화의문)
+NAME_VARIANT,2815,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=잠실(8) / OA-12035=잠실(송파구청)
+NAME_VARIANT,2823,,ACCEPTED_BY_CODE,시드 역명에 괄호 부연이 붙음. OA-15994=남한산성입구 / OA-12035=남한산성입구(성남법원.검찰청)

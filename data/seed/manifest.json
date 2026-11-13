@@ -1,0 +1,108 @@
+{
+  "source": {
+    "dataset_id": "OA-12035",
+    "title": "서울교통공사_역주소 및 전화번호",
+    "url": "https://data.seoul.go.kr/dataList/OA-12035/S/1/datasetView.do",
+    "file_name": "OA-12035_서울교통공사_역주소_20250318.csv",
+    "file_sha256": "442fe16d2c7e93c458d1cf31df173d42e24b910b9a9a710ffe4ab0d65b13d5d2",
+    "encoding": "cp949",
+    "retrieved_on": "2026-11-13",
+    "base_date": "미확정: 페이지 본문은 2025년 8월 기준, 최신 파일명은 20250318, 검색 결과에는 2026년 2월 기준 표기",
+    "license": "공공누리 1유형 (페이지 표기, 원문 대조 전)",
+    "operator_scope": "서울교통공사"
+  },
+  "transfer_source": {
+    "dataset_id": "OA-13290",
+    "title": "서울교통공사_환승역거리 소요시간 정보",
+    "url": "https://data.seoul.go.kr/dataList/OA-13290/S/1/datasetView.do",
+    "file_name": "OA-13290_transfer_20250331.csv",
+    "file_sha256": "3699fadb54cb42d7ce6fb17525d609d1f506e6c3ade3d10fa7806b001b80ec09",
+    "encoding": "cp949",
+    "rows": 140,
+    "retrieved_on": "2026-11-13",
+    "base_date": "2025.03 기준 자료(페이지 설명), 데이터 갱신일 2025.03.31, 갱신주기 연간(페이지 표기)",
+    "license": "공공누리 1유형 (검색 결과 표기, 원문 대조 전)",
+    "note": "환승소요시간은 환승거리를 보행속도 1.2m/s로 나눈 추정치다(페이지 설명). 이 시드는 환승 여부 근거로만 쓰고 소요시간은 쓰지 않는다."
+  },
+  "rows": {
+    "source_total": 289,
+    "seed_lines_1_to_8": 276,
+    "excluded_line_9": 13,
+    "per_line": {
+      "1": 10,
+      "2": 50,
+      "3": 34,
+      "4": 26,
+      "5": 56,
+      "6": 39,
+      "7": 42,
+      "8": 19
+    }
+  },
+  "coverage": {
+    "line_1": "PARTIAL",
+    "line_1_note": "1호선은 10개 역만 포함한다. 나머지 구간은 별도 조사 대상이며 미확보다.",
+    "lines_2_to_8": "UNVERIFIED_AGAINST_OFFICIAL_COUNTS",
+    "statement": "1~8호선 전체를 확보했다는 뜻이 아니다.",
+    "official_transfer_rows_not_resolvable_to_seed": [
+      {
+        "line": "2",
+        "official_station_name": "신도림",
+        "transfer_to": "1호선",
+        "reason": "상대 노선의 시드 역 또는 일치하는 반대 방향 기록이 없음"
+      },
+      {
+        "line": "4",
+        "official_station_name": "창동",
+        "transfer_to": "1호선",
+        "reason": "상대 노선의 시드 역 또는 일치하는 반대 방향 기록이 없음"
+      },
+      {
+        "line": "5",
+        "official_station_name": "까치산",
+        "transfer_to": "2호선",
+        "reason": "상대 노선의 시드 역 또는 일치하는 반대 방향 기록이 없음"
+      },
+      {
+        "line": "5",
+        "official_station_name": "신길",
+        "transfer_to": "1호선",
+        "reason": "상대 노선의 시드 역 또는 일치하는 반대 방향 기록이 없음"
+      },
+      {
+        "line": "7",
+        "official_station_name": "도봉산",
+        "transfer_to": "1호선",
+        "reason": "상대 노선의 시드 역 또는 일치하는 반대 방향 기록이 없음"
+      },
+      {
+        "line": "7",
+        "official_station_name": "가산디지털단지",
+        "transfer_to": "1호선",
+        "reason": "상대 노선의 시드 역 또는 일치하는 반대 방향 기록이 없음"
+      },
+      {
+        "line": "7",
+        "official_station_name": "온수",
+        "transfer_to": "1호선",
+        "reason": "상대 노선의 시드 역 또는 일치하는 반대 방향 기록이 없음"
+      }
+    ]
+  },
+  "oa15994_link": {
+    "sample": "OA-15994_SeoulMetroFaciInfo_2026-11-13.json",
+    "sample_sha256": "e057da45b9239079cd7e22f504231578c29a53319fc0065f509c48f5b39bc949",
+    "stn_cd_distinct": 274,
+    "linked": 274,
+    "not_in_seed": [],
+    "basis": "OA-15994 STN_CD(2026-11-13 샘플) == OA-12035 역번호(4자리 패딩)"
+  },
+  "review": {
+    "transfer_confirmed_groups": 34,
+    "transfer_confirmed_manual": 1,
+    "transfer_candidates_pending": 0,
+    "name_variant_pending": 5,
+    "name_variant_accepted_by_code": 66
+  },
+  "generated_by": "scripts/build_station_seed.py"
+}
