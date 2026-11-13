@@ -1,0 +1,20 @@
+[project]
+name = "woowangthon-be"
+version = "0.1.0"
+description = "지하철 엘리베이터 접근성 안내 및 출발 시각 추천 서비스 백엔드"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "alembic>=1.20.1",
+    "pydantic-settings>=2.16.2",
+    "sqlalchemy>=2.1.8",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
