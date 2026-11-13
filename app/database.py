@@ -1,5 +1,7 @@
+from collections.abc import Iterator
+
 from sqlalchemy import Engine, create_engine, event
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import settings
 
@@ -28,3 +30,12 @@ def make_engine(url: str) -> Engine:
 
 engine = make_engine(settings.database_url)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+
+
+def get_session() -> Iterator[Session]:
+    """요청마다 세션을 하나 열고 끝나면 닫는다. 테스트는 이 의존성을 임시 DB로 바꿔 쓴다."""
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
