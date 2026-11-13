@@ -41,3 +41,13 @@ uv run pytest
 
 - 서비스 코드에서는 `app.errors.AppError(status_code, code, message)`를 던진다.
 - 경로 없음(404)은 `NOT_FOUND`, 허용되지 않은 메서드(405)는 `METHOD_NOT_ALLOWED`, 요청 값 오류(422)는 `VALIDATION_ERROR`, 처리되지 않은 예외(500)는 `INTERNAL_ERROR`다.
+
+## 역·노선 시드 적재
+
+1~8호선 역·노선 시드(OA-12035 기반)는 `data/seed/`에 있다. 출처, 커버리지, REVIEW 규칙은 [data/seed/SOURCES.md](data/seed/SOURCES.md)를 본다. **1호선은 일부 구간만 포함하며, 1~8호선 전체를 확보한 것이 아니다.**
+
+```bash
+uv run alembic upgrade head
+uv run python -m app.cli.load_seed --dry-run   # 적용해 본 뒤 롤백. DB는 바뀌지 않는다
+uv run python -m app.cli.load_seed             # 멱등 적재. 충돌하면 전체 롤백
+```
