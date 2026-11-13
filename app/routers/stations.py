@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.database import get_session
 from app.errors import CODE_VALIDATION_ERROR, AppError
-from app.schemas.stations import StationSearchResponse
-from app.services.stations import search_stations
+from app.schemas.stations import StationDetail, StationSearchResponse
+from app.services.stations import get_station_detail, search_stations
 
 router = APIRouter(prefix="/api/stations", tags=["stations"])
 
@@ -29,3 +29,12 @@ def list_stations(
             f"검색어는 앞뒤 공백을 제외하고 {KEYWORD_MIN}~{KEYWORD_MAX}자여야 합니다.",
         )
     return search_stations(session, keyword, line)
+
+
+@router.get("/{station_id}", response_model=StationDetail)
+def read_station(
+    station_id: int,
+    session: Session = Depends(get_session),
+) -> StationDetail:
+    """역 상세. 정수가 아니면 422, 0 이하이거나 없는 ID는 404다."""
+    return get_station_detail(session, station_id)
