@@ -74,6 +74,18 @@ def redact(text: str, api_key: str | None = None) -> str:
     return result
 
 
+_ANY_URL_PATTERN = re.compile(r"https?://[^\s'\"<>]+")
+URL_PLACEHOLDER = "[URL 생략]"
+
+
+def strip_urls(text: str) -> str:
+    """문자열의 http(s) URL을 통째로 지운다. 키 구간만 가리는 redact와 달리 호스트와 경로도 남기지 않는다.
+
+    사용자에게 보여 주거나 파일에 남길 외부 유래 문자열에 쓴다(요청 URL을 노출하지 않기 위해서다).
+    """
+    return _ANY_URL_PATTERN.sub(URL_PLACEHOLDER, text)
+
+
 def mask_url(url: str, api_key: str | None = None) -> str:
     """로그에 쓸 URL. 키 구간을 ****로 바꾼다."""
     return redact(url, api_key)
