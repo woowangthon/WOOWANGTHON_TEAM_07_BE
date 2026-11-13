@@ -85,3 +85,68 @@ def client(db):
     app = create_app()
     app.dependency_overrides[get_session] = lambda: db
     return TestClient(app)
+
+
+# ---------- 테스트 중 외부 네트워크 차단 (루프백만 허용) ----------
+
+import logging as _logging  # noqa: E402
+import socket as _socket  # noqa: E402
+
+_LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost", None}
+
+
+class ExternalNetworkBlocked(OSError):
+    """테스트가 외부 호스트로 연결을 시도했을 때. 실제 네트워크 실패처럼 httpx가 오류로 다루도록 OSError 계열이다."""
+
+
+@pytest.fixture(autouse=True)
+def block_external_network(monkeypatch):
+    """모든 테스트에서 루프백(127.0.0.1, ::1) 이외의 TCP 연결과 이름 조회를 막는다.
+
+    시도가 있었다면 시도한 호스트를 attempts에 기록한 뒤 ExternalNetworkBlocked를 던진다.
+    클라이언트가 이 오류를 다른 오류로 바꿔 삼켜도 가려지지 않도록, 테스트가 끝날 때 기록이 남아 있으면
+    실패시킨다. 일부러 시도를 일으킨 테스트는 확인한 뒤 attempts.clear()를 호출한다.
+    """
+    attempts: list[str] = []
+    real_connect = _socket.socket.connect
+    real_connect_ex = _socket.socket.connect_ex
+    real_getaddrinfo = _socket.getaddrinfo
+
+    def _check(host) -> None:
+        if host not in _LOOPBACK_HOSTS:
+            attempts.append(str(host))
+            raise ExternalNetworkBlocked(f"테스트 중 외부 네트워크 연결 시도가 차단되었습니다: {host}")
+
+    def guarded_connect(self, address, *args, **kwargs):
+        if isinstance(address, tuple):
+            _check(address[0])
+        return real_connect(self, address, *args, **kwargs)
+
+    def guarded_connect_ex(self, address, *args, **kwargs):
+        if isinstance(address, tuple):
+            _check(address[0])
+        return real_connect_ex(self, address, *args, **kwargs)
+
+    def guarded_getaddrinfo(host, *args, **kwargs):
+        _check(host)
+        return real_getaddrinfo(host, *args, **kwargs)
+
+    monkeypatch.setattr(_socket.socket, "connect", guarded_connect)
+    monkeypatch.setattr(_socket.socket, "connect_ex", guarded_connect_ex)
+    monkeypatch.setattr(_socket, "getaddrinfo", guarded_getaddrinfo)
+    yield attempts
+    assert attempts == [], f"테스트가 외부 네트워크 연결을 시도했습니다: {attempts}"
+
+
+@pytest.fixture
+def loggers_enabled():
+    """앞선 Alembic 테스트의 fileConfig가 기존 로거를 꺼 둘 수 있으므로, 로그 테스트 동안만 켠다."""
+    names = ["httpx", "httpcore", "app.clients.seoul_open_api"]
+    saved = {n: (_logging.getLogger(n).disabled, _logging.getLogger(n).propagate) for n in names}
+    for n in names:
+        _logging.getLogger(n).disabled = False
+        _logging.getLogger(n).propagate = True
+    yield
+    for n, (disabled, propagate) in saved.items():
+        _logging.getLogger(n).disabled = disabled
+        _logging.getLogger(n).propagate = propagate
