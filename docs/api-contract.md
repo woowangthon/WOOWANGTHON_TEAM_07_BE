@@ -146,6 +146,8 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 
 ### 3.2 응답 (200)
 
+1호선이 포함된 역(`lines`에 `1` 포함)은 `limitations`에 D11 문구를 넣는다. 예시의 서울역이 그렇다. 좌표가 확인되지 않은 역은 `latitude`, `longitude`가 `null`이며, 임의로 채우지 않는다(D13).
+
 ```json
 {
   "station_id": 1,
@@ -157,7 +159,9 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
     {"line_id": "1", "line_name": "1호선"},
     {"line_id": "4", "line_name": "4호선"}
   ],
-  "limitations": []
+  "limitations": [
+    "1호선은 일부 구간의 역만 포함되어 있어 전체 구간을 포함하지 않음"
+  ]
 }
 ```
 
@@ -178,6 +182,7 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 | 상황 | 상태 | `error.code` |
 |---|---|---|
 | 없는 `station_id` | 404 | `NOT_FOUND` |
+| `station_id`가 0 이하 (`0`, `-1` 등) | 404 | `NOT_FOUND` (D12) |
 | `station_id`가 정수가 아님 | 422 | `VALIDATION_ERROR` |
 
 ---
@@ -513,6 +518,8 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 | D9 | `limitations` 문구 | 한국어 안내 문구 사용. 표준 문구는 0.4절 | 0.4절 |
 | D10 | 역 목록 정렬·페이징 | 역명 오름차순, 동일 역명은 `station_id` 오름차순. MVP에서는 페이징 없음 | 2.3절 |
 | D11 | 1호선 커버리지 | 1호선은 일부 구간만 확보했으므로 1호선 역이 포함된 응답의 `limitations`에 이를 명시 | 0.4절, 9절 |
+| D12 | 역 상세의 0 이하 ID | `station_id`가 0 이하이면 404 `NOT_FOUND`. 정수가 아니면 422 `VALIDATION_ERROR` 유지 | 3.4절 |
+| D13 | 좌표 `null` | 좌표가 확인되지 않은 역은 `latitude`, `longitude`를 `null`로 반환하고 임의로 채우지 않음 | 3.2절, 3.3절 |
 
 ### 10.2 FE/AI 검토가 필요한 항목
 

@@ -4,48 +4,8 @@
 """
 
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
-from app.database import get_session
-from app.main import create_app
-from app.models import Line, Station, StationLine
 from app.services.stations import LINE_1_LIMITATION
-
-# 픽스처: 역 id, 역명, 노선. 실제 역 마스터가 아니라 검색·필터·정렬 규칙을 보려는 시험 데이터다.
-FIXTURE = [
-    (1, "서울역", ["1", "4"]),          # 환승역
-    (2, "시청", ["1", "2"]),            # 환승역
-    (3, "강남", ["2"]),
-    (4, "동묘앞", ["1"]),
-    (5, "교대(법원, 검찰청)", ["2", "3"]),  # 환승역, 괄호 포함 이름
-    (6, "서울대입구(관악구청)", ["2"]),
-    (9, "신도림", ["2"]),                # 같은 역명을 두 개 둔다(정렬 확인)
-    (8, "신도림", ["1"]),
-]
-
-
-@pytest.fixture
-def db(engine):
-    with Session(engine) as session:
-        for n in range(1, 9):
-            session.add(Line(line_id=str(n), line_name=f"{n}호선", operator=None))
-        session.flush()
-        for station_id, name, lines in FIXTURE:
-            session.add(Station(station_id=station_id, station_name=name))
-        session.flush()
-        for station_id, _, lines in FIXTURE:
-            for line_id in lines:
-                session.add(StationLine(station_id=station_id, line_id=line_id))
-        session.commit()
-        yield session
-
-
-@pytest.fixture
-def client(db):
-    app = create_app()
-    app.dependency_overrides[get_session] = lambda: db
-    return TestClient(app)
 
 
 def names(body) -> list[str]:
