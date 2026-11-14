@@ -117,7 +117,7 @@ def test_healthy_target_returns_empty_with_reason(client, graph):
 
 def test_stale_available_target_still_searches(client, db, graph):
     _add_elevator(db, 801, 8, RUNNING)
-    _add_elevator(db, 802, 8, RUNNING, age=timedelta(hours=2))  # 일부 미확인 -> data_fresh False
+    _add_elevator(db, 802, 8, RUNNING, age=timedelta(hours=3))  # 일부 미확인 -> data_fresh False
     _edge(db, 8, "1", 7, "1")
     db.commit()
 
