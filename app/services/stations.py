@@ -37,15 +37,17 @@ def _includes_line_1(lines: list[LineRef]) -> bool:
     return any(ln.line_id == LINE_1 for ln in lines)
 
 
-def search_stations(session: Session, keyword: str, line: str | None) -> StationSearchResponse:
-    """역명에 keyword가 포함된 역을 찾는다.
+def search_stations(session: Session, keyword: str | None, line: str | None) -> StationSearchResponse:
+    """역명에 keyword가 포함된 역을 찾는다. keyword가 None이면 전체 역을 돌려준다.
 
     - keyword는 호출 전에 앞뒤 공백이 제거되어 있어야 한다.
     - line을 주면 그 노선을 지나는 역만 고르고, 응답의 lines에는 역의 전체 노선을 담는다.
     - 환승역은 station 한 행이므로 한 번만 나온다(역명·주소로 병합하지 않음).
     - 정렬: 역명 오름차순, 같은 역명이면 station_id 오름차순.
     """
-    stmt = select(Station).where(Station.station_name.contains(keyword, autoescape=True))
+    stmt = select(Station)
+    if keyword is not None:
+        stmt = stmt.where(Station.station_name.contains(keyword, autoescape=True))
     if line is not None:
         stmt = stmt.where(
             Station.station_id.in_(select(StationLine.station_id).where(StationLine.line_id == line))

@@ -60,12 +60,12 @@ def test_empty_query_after_trim_is_rejected(client, q):
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
-def test_missing_query_is_rejected_with_common_error(client):
+def test_missing_query_returns_all_stations(client):
+    # #73: q 생략은 전체 목록이다. 상세 검증은 tests/test_station_listing.py
     response = client.get("/api/stations")
 
-    assert response.status_code == 422
-    assert set(response.json()) == {"error"}
-    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+    assert response.status_code == 200
+    assert response.json()["count"] == 10
 
 
 def test_line_filter_keeps_full_line_list(client):
