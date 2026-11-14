@@ -4,6 +4,44 @@
 
 ## 실행 방법
 
+### Google·카카오 로그인 준비
+
+코드는 인증 키 없이도 실행된다. 키가 없는 제공자의 로그인 요청은 503 `AUTH_NOT_CONFIGURED`를 반환하며 데모 인증으로 바뀌지 않는다.
+
+1. 기존 `BE/.env`에 아래 네 값을 추가한다. 이미 있는 `.env`를 덮어쓰지 않는다.
+
+   ```dotenv
+   GOOGLE_CLIENT_ID=발급받은_웹_클라이언트_ID
+   GOOGLE_CLIENT_SECRET=발급받은_클라이언트_시크릿
+   KAKAO_CLIENT_ID=발급받은_REST_API_키
+   KAKAO_CLIENT_SECRET=발급받은_클라이언트_시크릿
+   CORS_ALLOWED_ORIGINS=http://127.0.0.1:5173
+   ```
+
+2. Google 웹 애플리케이션 OAuth 클라이언트에 승인된 리디렉션 URI `http://127.0.0.1:8000/api/auth/google/callback`을 등록한다. OAuth 동의 화면을 설정하고 테스트 모드라면 사용할 Google 계정을 테스트 사용자로 추가한다.
+3. 카카오 앱의 카카오 로그인을 활성화하고 Redirect URI `http://127.0.0.1:8000/api/auth/kakao/callback`을 등록한다. `KAKAO_CLIENT_ID`에는 REST API 키를 사용한다. Client Secret 기능이 켜져 있으면 `KAKAO_CLIENT_SECRET`이 필수다. 닉네임 제공에 동의하지 않아도 기본 이름으로 로그인할 수 있다.
+4. 대상 DB를 백업한 뒤 마이그레이션을 적용하고 서버를 시작한다. 아래 명령은 **직접 실행할 때 설정된 DB를 변경**한다. 이번 구현 검증에서는 임시 DB만 사용했다.
+
+   ```powershell
+   # BE 폴더
+   uv run alembic upgrade head
+   uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log
+   # 다른 터미널, FE/web 폴더
+   npm.cmd run dev:auth
+   ```
+
+`http://127.0.0.1:5173/#/main`에서 로그인 탭을 연다. `dev:auth`는 실제 인증을 사용하며 일반 `dev`의 데모 설정을 바꾸지 않는다. 로그인한 뒤 이름·즐겨찾기 역/장소를 저장하면 서버 DB에서 새로고침·재로그인 때 복원한다. 로그아웃은 세션만 폐기하고 즐겨찾기는 남긴다. 역 추천은 저장한 역과 확인된 역 ID만 사용한다. 역 목록이 없는 새 DB에서는 역 시드 적재가 별도로 필요하다.
+
+인증 키가 필요한 실제 제공자 로그인은 키 발급 후 확인해야 한다. 테스트는 제공자의 토큰·사용자 정보 HTTP 응답을 대체해 OAuth 흐름과 DB 저장을 검증하며 실제 Google·카카오에 접속하지 않는다.
+
+배포 시 `AUTH_PUBLIC_BASE_URL=https://백엔드주소`, `AUTH_FRONTEND_URL=https://프론트주소/#/main`, `AUTH_COOKIE_SECURE=true`, `CORS_ALLOWED_ORIGINS=https://프론트주소`로 설정하고 콘솔의 콜백 URI도 같은 값으로 바꾼다. FE의 `VITE_API_BASE`·`VITE_BE_BASE`에는 공개 BE 주소만 넣고 `npm.cmd run build:auth`로 빌드한다. 쿠키는 SameSite=Lax이므로 FE/BE는 같은 사이트의 HTTPS 도메인 또는 같은 Origin의 프록시로 배치한다. 서로 다른 사이트를 연결하는 쿠키 구성은 지원하지 않는다. 로컬에서도 `localhost`와 `127.0.0.1`을 섞지 않는다.
+
+세션 쿠키·OAuth 코드가 접근 로그에 남지 않도록 인증 서버 실행 예시는 `--no-access-log`를 사용한다. 역·시간표 수집 API는 기존 방식대로 유지하며, 로그인 라우터만 OAuth 코드 교환과 사용자 정보 조회를 외부 제공자에 요청한다.
+
+공식 설정 기준: [Google 웹 서버 OAuth](https://developers.google.com/identity/protocols/oauth2/web-server), [카카오 로그인 REST API](https://developers.kakao.com/docs/ko/kakaologin/rest-api).
+
+### 기본 서버 실행
+
 사전 준비: [uv](https://docs.astral.sh/uv/) 설치.
 
 ```bash
@@ -97,7 +135,7 @@ uv run python scripts/demo_check.py     # 점검(로컬 서버만 대상)
 ```
 
 - FE가 다른 PC나 다른 포트에서 호출하면 `.env`의 `CORS_ALLOWED_ORIGINS`에 그 Origin(예: `http://192.168.0.10:5173`)을 넣고 서버를 다시 시작한다.
-- 방화벽에서 포트 8000을 열어야 같은 네트워크의 다른 PC가 접근한다. 인증이 없으므로 외부 인터넷에는 열지 않는다.
+- 방화벽에서 포트 8000을 열어야 같은 네트워크의 다른 PC가 접근한다. 역·경로 API는 공개 읽기 API이며, 외부 인터넷 배포는 HTTPS·접근 제어 등 배포 조건을 갖춘 뒤 진행한다. 실제 로그인은 위 OAuth 설정을 따른다.
 - 수집 데이터는 자동으로 갱신되지 않는다. 시연 직전에 `collect_elevators --apply`를 다시 실행한다(서버를 멈출 필요는 없지만 쓰는 순간 잠깐 잠길 수 있다).
 - 시간표와 인접 간선은 자주 바뀌지 않으므로 한 번만 준비하면 된다.
 

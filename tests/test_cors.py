@@ -35,7 +35,7 @@ def test_listed_origin_is_allowed(monkeypatch):
 
     response = client.get("/health", headers={"Origin": ORIGIN})
     assert response.headers["access-control-allow-origin"] == ORIGIN
-    assert "access-control-allow-credentials" not in response.headers
+    assert response.headers["access-control-allow-credentials"] == "true"
     ok = preflight(client, "https://demo.example.com")
     assert ok.status_code == 200 and ok.headers["access-control-allow-origin"] == "https://demo.example.com"
     assert "POST" in ok.headers["access-control-allow-methods"]
@@ -46,7 +46,8 @@ def test_unlisted_origin_and_method_are_rejected(monkeypatch):
 
     assert "access-control-allow-origin" not in client.get("/health", headers={"Origin": "http://evil.example"}).headers
     assert preflight(client, "http://evil.example").status_code == 400
-    assert preflight(client, ORIGIN, method="DELETE").status_code == 400
+    assert preflight(client, ORIGIN, method="DELETE").status_code == 200
+    assert preflight(client, ORIGIN, method="PUT").status_code == 400
 
 
 @pytest.mark.parametrize("bad", ["*", "http://*.example.com", "localhost:5173", "ftp://a.com",

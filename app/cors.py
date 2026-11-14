@@ -2,13 +2,13 @@
 
 - 기본값은 빈 값이다. 빈 값이면 CORS 미들웨어를 붙이지 않는다(교차 출처 요청을 허용하지 않는다).
 - 와일드카드(*), 경로·쿼리가 있는 값, http(s)가 아닌 스킴은 서버 시작 시 오류다.
-- 쿠키·인증 정보는 허용하지 않는다(allow_credentials=False). 메서드는 GET, POST, OPTIONS만 허용한다.
+- 명시된 Origin에만 쿠키를 허용한다. 변경 요청은 인증 라우터에서 Origin·CSRF를 추가 확인한다.
 """
 
 from urllib.parse import urlsplit
 
-ALLOWED_METHODS = ["GET", "POST", "OPTIONS"]
-ALLOWED_HEADERS = ["Content-Type"]
+ALLOWED_METHODS = ["GET", "POST", "PATCH", "DELETE", "OPTIONS"]
+ALLOWED_HEADERS = ["Content-Type", "X-CSRF-Token"]
 
 
 def parse_origins(raw: str) -> list[str]:
