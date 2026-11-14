@@ -213,7 +213,7 @@ def test_global_list_includes_every_elevator_with_station_name(client, seeded):
     assert body["limitations"] == [GLOBAL_SOME_UNKNOWN]
     first = body["elevators"][0]
     assert set(first) == {
-        "elevator_id", "elevator_name", "station_id", "station_name",
+        "elevator_id", "elevator_name", "station_id", "station_name", "lines",
         "status", "data_fresh", "unknown_reason", "observed_at", "fetched_at",
     }
     assert first["station_name"] == "서울역"
@@ -345,5 +345,6 @@ def test_station_query_count_does_not_grow_with_elevators(client, seeded):
     assert three_elevators <= 2  # 역 1건 + 설비·상태 조인 1건
 
 
-def test_global_query_is_a_single_select(client, seeded):
-    assert _count_selects(seeded, client, "/api/elevators/status") == 1
+def test_global_query_uses_a_constant_number_of_selects(client, seeded):
+    # 설비+상태 1회, 역별 노선 1회. 설비 수와 무관하다(N+1 아님).
+    assert _count_selects(seeded, client, "/api/elevators/status") == 2

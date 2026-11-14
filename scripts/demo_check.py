@@ -23,6 +23,7 @@ LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 KST = timezone(timedelta(hours=9))
 PASS, WARN, SKIP, FAIL = "PASS", "WARN", "SKIP", "FAIL"
 ARRIVAL_STATUSES = {"CONFIRMED", "EMPTY", "UNCONFIRMED"}
+ROUTE_WARNING_STATUSES = {"WARNING", "UNCONFIRMED", "CLEAR"}
 
 
 class Report:
@@ -84,6 +85,7 @@ def run_checks(client: httpx.Client, query: str = "서울역") -> Report:
         return report
 
     station_id = None
+    alternative_id = None
     body = _check(report, client, "GET /api/stations?q=", "GET", "/api/stations",
                   keys={"stations", "count", "limitations"}, params={"q": query})
     if body is not None:
@@ -119,7 +121,19 @@ def run_checks(client: httpx.Client, query: str = "서울역") -> Report:
             if body["count"] == 0:
                 report.add(WARN, "GET /api/stations/{id}/alternatives", "후보 없음은 정상")
             else:
+                alternative_id = body["alternatives"][0]["station_id"]
                 report.add(PASS, "GET /api/stations/{id}/alternatives", f"{body['count']}건")
+
+        if alternative_id is None:
+            report.add(WARN, "GET /api/routes", "경로를 점검할 두 번째 역(대체역 후보)이 없음")
+        else:
+            body = _check(report, client, "GET /api/routes", "GET", "/api/routes",
+                          keys={"stations", "total_minutes", "estimated", "timeline", "elevator_warning", "limitations"},
+                          params={"from": station_id, "to": alternative_id})
+            if body is not None:
+                ok = body["estimated"] is True and body["elevator_warning"].get("status") in ROUTE_WARNING_STATUSES
+                report.add(PASS if ok else FAIL, "GET /api/routes",
+                           f"{len(body['stations'])}개 역, {body['total_minutes']}분(추정)" if ok else "추정·경고 필드가 계약과 다름")
 
         body = _check(report, client, "GET /api/stations/{id}/arrivals", "GET",
                       f"/api/stations/{station_id}/arrivals",
@@ -132,6 +146,13 @@ def run_checks(client: httpx.Client, query: str = "서울역") -> Report:
                 report.add(PASS, "GET /api/stations/{id}/arrivals", "CONFIRMED")
             else:
                 report.add(WARN, "GET /api/stations/{id}/arrivals", f"{status}는 정상(외부 출처 미연동 포함)")
+
+    body = _check(report, client, "GET /api/elevators/status?line=", "GET", "/api/elevators/status",
+                  keys={"elevators", "count", "limitations"}, params={"line": "2"})
+    if body is not None:
+        has_lines = all("lines" in e for e in body["elevators"])
+        report.add(PASS if has_lines else FAIL, "GET /api/elevators/status?line=",
+                   f"{body['count']}건" if has_lines else "설비에 lines 필드가 없음")
 
     arrival_at = (datetime.now(KST) + timedelta(days=1)).replace(microsecond=0).isoformat()
     body = _check(report, client, "POST /api/departure-time", "POST", "/api/departure-time",

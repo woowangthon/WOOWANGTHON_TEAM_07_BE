@@ -94,3 +94,38 @@ def test_error_format(smoke):
     response = client.get("/api/stations/999999")
 
     assert response.status_code == 404 and response.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_route_between_real_demo_stations(smoke):
+    client, session = smoke
+    a = _station_id(session, "서울역")
+    alternatives = client.get(f"/api/stations/{a}/alternatives").json()["alternatives"]
+    # 대체역 후보가 없어도(전부 미확인) 인접 간선으로 닿는 역은 경로가 있어야 한다. 서울역 -> 시청
+    b = alternatives[0]["station_id"] if alternatives else _station_id(session, "시청")
+
+    response = client.get("/api/routes", params={"from": a, "to": b})
+
+    body = response.json()
+    assert response.status_code == 200, body
+    assert body["estimated"] is True and body["total_minutes"] > 0
+    assert body["elevator_warning"]["status"] in {"WARNING", "UNCONFIRMED", "CLEAR"}
+    assert body["limitations"]
+
+
+def test_status_list_has_lines_and_line_filter(smoke):
+    client, _ = smoke
+    body = client.get("/api/elevators/status", params={"line": "2"}).json()
+
+    assert body["count"] > 0
+    assert all(any(ln["line_id"] == "2" for ln in e["lines"]) for e in body["elevators"])
+
+
+def test_departure_time_with_stations_uses_the_demo_graph(smoke):
+    client, session = smoke
+    response = client.post("/api/departure-time", json={
+        "arrival_at": "2099-01-01T09:00:00+09:00", "travel_minutes": 30,
+        "from_station_id": _station_id(session, "서울역"), "to_station_id": _station_id(session, "시청"),
+    })
+
+    assert response.status_code == 200
+    assert response.json()["elevator_warning"]["status"] in {"WARNING", "UNCONFIRMED", "CLEAR"}

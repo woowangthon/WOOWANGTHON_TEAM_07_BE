@@ -4,10 +4,9 @@
 
 보안 규칙
 - API 키는 URL 경로에 들어간다. 로그, 예외 메시지, 객체 표현 어디에도 키를 남기지 않는다.
-- 평문 HTTP는 기본으로 막는다. 8088 포트에 HTTPS로 연결을 시도했을 때 개발 환경에서
-  TLS 핸드셰이크가 실패했다(2026-11-13). 이것은 이 환경에서 연결에 실패했다는 기록이며
-  서비스의 HTTPS 지원 여부를 단정하지 않는다. 평문으로 키를 보내려면
-  allow_insecure_http=True를 명시해야 하며, 승인 전에는 쓰지 않는다.
+- 평문 HTTP를 기본으로 허용한다(팀 결정 2026-11-14). 문서화된 주소가 http://...:8088뿐이고
+  HTTPS 연결은 개발 환경에서 TLS 핸드셰이크가 실패했다(2026-11-13, 서비스의 HTTPS 지원 여부는 단정하지 않음).
+  키는 서버의 .env에만 두고 로그·예외에는 가린다. HTTPS만 허용하려면 allow_insecure_http=False를 준다.
 - 리다이렉트를 따라가지 않는다(키가 다른 호스트로 새는 것을 막는다).
 - 외부 응답의 오류 메시지에도 키가 들어 있을 수 있어 정리한 뒤에만 예외에 담는다.
 - 예외는 `from None`으로 던져 원인 예외(URL을 담을 수 있음)가 따라가지 않게 한다.
@@ -191,7 +190,7 @@ class SeoulOpenApiClient:
         api_key: str,
         *,
         base_url: str = DEFAULT_BASE_URL,
-        allow_insecure_http: bool = False,
+        allow_insecure_http: bool = True,
         transport: httpx.BaseTransport | None = None,
         timeout: httpx.Timeout = TIMEOUT,
     ) -> None:
@@ -203,7 +202,7 @@ class SeoulOpenApiClient:
             raise SeoulOpenApiConfigError("base_url 형식이 올바르지 않습니다.")
         if parts.scheme == "http" and not allow_insecure_http:
             raise SeoulOpenApiConfigError(
-                "평문 HTTP로 API 키를 보낼 수 없습니다. HTTPS base_url을 쓰거나 allow_insecure_http=True를 명시해야 합니다."
+                "평문 HTTP로 API 키를 보낼 수 없도록 설정되어 있습니다. HTTPS base_url을 쓰세요."
             )
         self._key = key
         self._base_url = base_url.rstrip("/")
@@ -221,11 +220,13 @@ class SeoulOpenApiClient:
     def close(self) -> None:
         self._client.close()
 
-    def _url(self, service: str, start: int, end: int) -> str:
-        return f"{self._base_url}/{quote(self._key, safe='')}/json/{service}/{start}/{end}/"
+    def _url(self, service: str, start: int, end: int, args: tuple[str, ...] = ()) -> str:
+        extra = "".join(f"{quote(a, safe='')}/" for a in args)
+        return f"{self._base_url}/{quote(self._key, safe='')}/json/{service}/{start}/{end}/{extra}"
 
-    def fetch_page(self, service: str, start: int, end: int) -> Page:
-        url = self._url(service, start, end)
+    def fetch_page(self, service: str, start: int, end: int, args: tuple[str, ...] = ()) -> Page:
+        """args는 시작·끝 뒤에 붙는 서비스별 요청 인자(예: 역 코드, 요일, 방향)다."""
+        url = self._url(service, start, end, args)
         logger.info("OpenAPI 호출: %s", mask_url(url, self._key))
 
         # 예외는 except 블록 밖에서 던진다. 블록 안에서 던지면 원본 예외(요청 URL, 곧 키를 담을 수 있음)가
@@ -254,9 +255,9 @@ class SeoulOpenApiClient:
             raise failure
         return parse_envelope(payload, service, self._key)
 
-    def fetch_all_rows(self, service: str) -> FetchResult:
+    def fetch_all_rows(self, service: str, args: tuple[str, ...] = ()) -> FetchResult:
         """전체 행을 페이지 단위로 받는다. 어느 단계든 어긋나면 예외를 올리고 부분 결과를 돌려주지 않는다."""
-        first = self.fetch_page(service, 1, PAGE_SIZE)
+        first = self.fetch_page(service, 1, PAGE_SIZE, args)
         if first.code == CODE_NO_DATA or first.total == 0:
             return FetchResult(rows=[], total=0, pages=1)
 
@@ -270,7 +271,7 @@ class SeoulOpenApiClient:
         for page_no in range(2, pages + 1):
             start = (page_no - 1) * PAGE_SIZE + 1
             end = min(page_no * PAGE_SIZE, total)
-            page = self.fetch_page(service, start, end)
+            page = self.fetch_page(service, start, end, args)
             if page.code == CODE_NO_DATA:
                 raise SeoulOpenApiResponseError(f"범위 {start}-{end}에 데이터가 없습니다(INFO-200).")
             if page.total != total:

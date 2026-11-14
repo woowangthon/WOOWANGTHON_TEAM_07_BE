@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     # 환경 변수 CORS_ALLOWED_ORIGINS(쉼표 구분, 예: http://localhost:5173). 기본은 빈 값이며 교차 출처를 허용하지 않는다.
     cors_allowed_origins: str = ""
 
+    # 경로 탐색 가중치(분). 환경 변수 ROUTE_SEGMENT_MINUTES, ROUTE_TRANSFER_MINUTES. 검증되지 않은 추정값이다.
+    route_segment_minutes: int = Field(default=2, ge=1, le=30)
+    route_transfer_minutes: int = Field(default=5, ge=0, le=60)
+
     # 출발 권장 시각 계산의 추정 기본값(분, 0~120). 환경 변수로 바꾼다. 검증되지 않은 추정값이다.
     walk_to_station_minutes: int = Field(
         default=WALK_TO_STATION_DEFAULT, ge=SEGMENT_MINUTES_MIN, le=SEGMENT_MINUTES_MAX

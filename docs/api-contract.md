@@ -84,9 +84,9 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 | 2 | GET | `/api/stations/{station_id}` | 3절 | #22 | 계약 초안 |
 | 3 | GET | `/api/stations/{station_id}/elevators` | 4절 | #28 | 계약 초안 |
 | 4 | GET | `/api/elevators/status` | 5절 | #28 | 계약 초안 |
-| 5 | GET | `/api/stations/{station_id}/alternatives` | 8절 (예약) | #33 | 후속 확정 |
-| 6 | GET | `/api/routes` | 8절 (예약) | #37 | 후속 확정 |
-| 7 | POST | `/api/departure-time` | 8.2절 | #39 | 계약 초안(구현됨, 시간표 미사용) |
+| 5 | GET | `/api/stations/{station_id}/alternatives` | 8.1절 | #33 | 계약 초안(구현됨) |
+| 6 | GET | `/api/routes` | 8.4절 | #36, #37 | 계약 초안(구현됨, 추정 소요 시간) |
+| 7 | POST | `/api/departure-time` | 8.2절 | #39 | 계약 초안(구현됨, 시간표 미사용, 역 id를 주면 경로 경고) |
 | 8 | GET | `/api/stations/{station_id}/arrivals` | 8.3절 | #40, #41 | 계약 초안(구현됨, 외부 출처 미연동) |
 
 ---
@@ -322,11 +322,13 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 | 파라미터 | 위치 | 필수 | 타입 | 규칙 |
 |---|---|---|---|---|
 | `status` | query | 선택 | string | `"가동중"` 또는 `"가동 안됨"`. 그 외는 422 |
+| `line` | query | 선택 | string | `"1"`~`"8"`. 그 노선을 지나는 역의 설비만 남긴다. 그 외는 422 |
 
-요청 예시: `GET /api/elevators/status?status=가동%20안됨`
+요청 예시: `GET /api/elevators/status?status=가동%20안됨&line=2`
 
 - `status`를 주면 **확인된 설비 중 해당 값과 일치하는 것만** 반환한다. 정보 없음 설비는 어떤 상태 필터에도 포함되지 않는다.
 - `status`를 주지 않으면 모든 EV 설비를 반환한다. 정보 없음 설비도 포함한다.
+- `line`은 설비가 아니라 **역이 지나는 노선**으로 거른다(OA-15994에 설비의 노선 정보가 없다). 환승역의 설비는 환승하는 모든 노선의 필터에 들어간다. 조건에 맞는 설비가 없으면 200과 `[]`다. `status`와 함께 쓰면 둘 다 만족하는 설비만 남는다.
 - 미확인 설비(NO_DATA 또는 STALE)가 한 개라도 있으면 필터 적용 여부와 무관하게 `limitations`에 `"일부 설비의 상태 정보가 없거나 오래되어 현재 상태를 확인하지 못함"`이 포함된다.
 
 ### 5.2 응답 (200)
@@ -339,6 +341,7 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
       "elevator_name": "승강기)엘리베이터-서울(1)역 섬식(상) 5-1 내부#1",
       "station_id": 1,
       "station_name": "서울역",
+      "lines": [{"line_id": "1", "line_name": "1호선"}, {"line_id": "4", "line_name": "4호선"}],
       "status": "가동 안됨",
       "data_fresh": true,
       "unknown_reason": null,
@@ -362,6 +365,7 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 | `elevators[].elevator_name` | string | 필수 | 아니오 | 설비명 |
 | `elevators[].station_id` | integer | 필수 | 아니오 | 소속 역 ID |
 | `elevators[].station_name` | string | 필수 | 아니오 | 소속 역명 |
+| `elevators[].lines` | array | 필수 | 아니오 | 소속 역이 지나는 **전체** 노선(`line_id`, `line_name`, 호선 오름차순). `line` 필터와 무관하다. 설비 자체의 노선이 아니다 |
 | `elevators[].status` | string | 필수 | **예** | 4.4절과 같다 |
 | `elevators[].data_fresh` | boolean | 필수 | 아니오 | 4.4절과 같다 |
 | `elevators[].unknown_reason` | string | 필수 | **예** | 4.4절과 같다 |
@@ -483,7 +487,7 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 | API | 확정 Issue | 이미 정해진 공통 규칙 |
 |---|---|---|
 | `GET /api/stations/{station_id}/alternatives` | #33 | `limitations` 항상 포함. 실제 접근 가능성은 미검증이라고 명시 |
-| `GET /api/routes` | #37 | `estimated: true` 포함. `limitations` 포함. 경로 없음 응답은 계약에서 정한다 |
+| `GET /api/routes` | #37 | 8.4절. `estimated: true`, `limitations` 포함. 경로 없음은 404 |
 | `POST /api/departure-time` | #39 | `estimated`, `limitations` 포함. 계산 결과를 DB에 저장하지 않음 |
 | `GET /api/stations/{station_id}/arrivals` | #40, #41 | 8.3절. 외부 실패 시 "미확인" 표시. 이전 캐시를 현재 정보처럼 보여 주지 않음 |
 
@@ -498,7 +502,7 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 
 ### 8.2 출발 권장 시각 `POST /api/departure-time` (#39, 필드·기본값 확정 — FE/AI 리뷰 전)
 
-도착 희망 시각에서 거꾸로 계산해 권장 출발 시각을 준다. 계산은 `app/services/departure_time.py`의 순수 함수를 그대로 쓴다. **경로 탐색, 실제 열차 시간표, 실시간 도착 정보, AI 추천을 쓰지 않는다.** DB를 읽지도 저장하지도 않는다.
+도착 희망 시각에서 거꾸로 계산해 권장 출발 시각을 준다. 계산은 `app/services/departure_time.py`의 순수 함수를 그대로 쓴다. **경로 탐색으로 이동 시간을 정하지 않고, 실제 열차 시간표, 실시간 도착 정보, AI 추천을 쓰지 않는다.** 결과를 저장하지 않는다. `from_station_id`와 `to_station_id`를 주지 않으면 DB도 읽지 않는다.
 
 `권장 출발 = 도착 희망 − (집→역 도보 + 역 진입 + 여유 시간 + 예상 이동 시간 + 출구 이동)`
 
@@ -508,12 +512,16 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 |---|---|---|---|---|
 | `arrival_at` | 필수 | string | 오프셋이 있는 ISO 8601, 초 단위(`2026-11-13T09:00:00+09:00`, `...Z`). 오프셋 없음·날짜만·소수 초는 422 | - |
 | `travel_minutes` | 필수 | integer | 1~720. **외부에서 받은 예상 이동 시간**(경로 탐색으로 검증하지 않음) | - |
-| `buffer_minutes` | 선택 | integer | 0~240. 필요한 여유 시간(탑승 전에 둠) | **0** |
+| `buffer_minutes` | 선택 | integer | 0~240. 승강장 대기·여유 시간(탑승 전에 둠) | **5** (추정값, 아래 참고) |
 | `walk_to_station_minutes` | 선택 | integer | 0~120. 집→역 도보 | 설정 `WALK_TO_STATION_MINUTES` (**7**) |
 | `station_entry_minutes` | 선택 | integer | 0~120. 역 진입 | 설정 `STATION_ENTRY_MINUTES` (**3**) |
 | `exit_walk_minutes` | 선택 | integer | 0~120. 하차 후 출구 이동 | 설정 `EXIT_WALK_MINUTES` (**3**) |
+| `from_station_id` | 선택 | integer | 출발역 `station_id`. `to_station_id`와 **함께** 주어야 한다(하나만 주면 422). 없는 역은 404, 같은 역끼리는 422 | - |
+| `to_station_id` | 선택 | integer | 도착역 `station_id` | - |
 
-- 선택 필드를 생략하거나 `null`로 주면 기본값을 쓰고, 쓴 필드 이름을 `defaults_applied`에 담는다. 7·3·3분은 **검증되지 않은 추정값**이다.
+- 선택 필드를 생략하거나(`buffer_minutes`) `null`로 주면(나머지) 기본값을 쓰고, 쓴 필드 이름을 `defaults_applied`에 담는다. `buffer_minutes`를 `0`으로 명시하면 기본값을 쓴 것이 아니다. 5·7·3·3분은 **검증되지 않은 추정값**이다.
+- `buffer_minutes` 기본 5분은 배차 간격 3분과 교통약자 여유 2분을 더한 값이다(팀 결정 2026-11-14, AI 파트 제안). 열차 한 대를 놓쳐도 늦지 않도록 최악 대기를 기본으로 두며, FE와 챗봇이 같은 값을 쓰도록 BE 한 곳에서 정한다.
+- `travel_minutes`는 계속 **외부 입력**이다. 경로 API(8.4절)의 `total_minutes`를 넘기는 것은 호출하는 쪽(FE, AI)이 한다. 이 API가 경로 API를 불러 값을 채우지 않는다. 역 id를 주면 경로는 경고 계산에만 쓴다.
 - "이미 지났는지"는 서버의 현재 시각으로 판단한다. 현재 시각을 요청으로 받지 않는다.
 
 **응답 (200).** 시각은 모두 KST(+09:00)다(0.2절).
@@ -556,12 +564,12 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 | `date_changed` | KST 날짜 기준으로 출발일과 도착일이 다르면 `true`(자정 이전 출발) |
 | `already_past` | 권장 출발 시각이 서버 현재 시각보다 이전이면 `true`. 같으면 `false` |
 | `estimated` / `timetable_used` | 항상 `true` / `false` |
-| `elevator_warning` | 역·설비 상태를 입력받거나 조회하지 않으므로 항상 `status: "UNCONFIRMED"`, `items: []`. **경고를 임의로 만들지 않는다.** 역 연동은 후속 범위 |
-| `limitations` | 위 3개 + 엘리베이터 미확인 문구가 항상 들어간다. `already_past`가 `true`면 "추천 출발 시각이 현재 시각보다 이미 지났음"이 추가된다 |
+| `elevator_warning` | 8.4절과 같은 형식(`status`, `items[]`, `message`). 역 id가 없으면 `status: "UNCONFIRMED"`, `items: []`이며 **경고를 임의로 만들지 않는다**. 역 id를 주면 두 역 사이 경로 위 **모든 역**을 판정한다. 경로를 찾지 못하면 오류가 아니라 `UNCONFIRMED`와 `items: []`다 |
+| `limitations` | 위 3개 + 경고 문구(`elevator_warning.message`)가 들어간다. `CLEAR`이면 경고 문구는 넣지 않는다. `already_past`가 `true`면 "추천 출발 시각이 현재 시각보다 이미 지났음"이 추가된다 |
 
 **오류.** 0.6절 형식이다. 잘못된 시각·형식, 정수가 아닌 값, 범위 밖 값, 알 수 없는 필드, 깨진 JSON, 표현 가능한 날짜 범위를 벗어난 시각은 422 `VALIDATION_ERROR`, GET 등 다른 메서드는 405다.
 
-**미구현(보류).** 경로 탐색(#37), 시간표 기반 탑승 열차 선택(#35 이후), 실시간 도착의 외부 출처 연동(#40, #41), 엘리베이터 경고의 역·설비 연동, AI 최적 경로 추천.
+**미구현(보류).** 시간표 기반 탑승 열차 선택(시간표 조회 함수 `find_last_train_departing_by`는 있으나 이 API에 연결하지 않았다), 실시간 도착의 외부 출처 연동(#40, #41), AI 최적 경로 추천.
 
 ---
 
@@ -578,6 +586,89 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 - 오류: 없거나 0 이하인 역 ID는 404, 정수가 아니면 422(0.6절). 외부 실패는 오류가 아니라 200 + `UNCONFIRMED`다.
 - 미결정: 출발 시각 API(8.2절)에 실시간 정보를 넣을지(#41). 지금은 넣지 않았다.
 
+### 8.4 경로 조회 `GET /api/routes` (#36, #37, 초안 — FE/AI 리뷰 전)
+
+두 역 사이의 최단 경로를 준다. **소요 시간은 고정 가중치를 쓴 추정값**이고, 엘리베이터 상태는 경로를 고르는 데 쓰지 않으며 경고로만 붙인다. 결과를 저장하지 않는다.
+
+**요청 (query).**
+
+| 파라미터 | 필수 | 타입 | 규칙 |
+|---|---|---|---|
+| `from` | 필수 | integer | 출발역 `station_id`. 정수가 아니면 422, 0 이하이거나 없는 역이면 404 |
+| `to` | 필수 | integer | 도착역 `station_id`. 위와 같다 |
+
+요청 예시: `GET /api/routes?from=3&to=7`
+
+**계산 규칙.**
+- 그래프의 노드는 역-노선이고 간선은 `station_edges`의 `ADJACENT`(역 간)와 `TRANSFER`(환승)다. 양방향으로 쓴다.
+- 가중치: 역 간 `ROUTE_SEGMENT_MINUTES`(기본 **2분**), 환승 `ROUTE_TRANSFER_MINUTES`(기본 **5분**). 검증되지 않은 추정값이다.
+- 출발역의 모든 노선에서 시작하고 도착역의 어느 노선에 닿아도 된다. 따라서 출발역에서 노선을 고르는 데 환승 시간은 들지 않는다.
+- 같은 비용이면 항상 같은 경로를 돌려준다.
+- 인접 간선은 열차 시간표에서 추출한다(`app.cli.derive_edges`, source `OA-101`). 공식 인접역 자료가 아니다. 환승 간선은 공식 기록(OA-13290)이다.
+
+**응답 (200).**
+
+```json
+{
+  "from_station": {"station_id": 3, "station_name": "강남"},
+  "to_station": {"station_id": 7, "station_name": "종로3가"},
+  "stations": [
+    {"station_id": 3, "station_name": "강남", "lines": [{"line_id": "2", "line_name": "2호선"}], "is_transfer": false,
+     "station_status": {"status": "UNAVAILABLE", "data_fresh": true, "total_elevator_count": 1, "unknown_elevator_count": 0}},
+    {"station_id": 5, "station_name": "교대(법원, 검찰청)", "lines": [{"line_id": "2", "line_name": "2호선"}, {"line_id": "3", "line_name": "3호선"}], "is_transfer": true,
+     "station_status": {"status": "PARTIAL", "data_fresh": true, "total_elevator_count": 2, "unknown_elevator_count": 0}},
+    {"station_id": 7, "station_name": "종로3가", "lines": [{"line_id": "3", "line_name": "3호선"}], "is_transfer": false,
+     "station_status": {"status": "AVAILABLE", "data_fresh": true, "total_elevator_count": 1, "unknown_elevator_count": 0}}
+  ],
+  "transfer_count": 1,
+  "total_minutes": 9,
+  "estimated": true,
+  "timeline": [
+    {"kind": "RIDE", "label": "2호선 강남 → 교대(법원, 검찰청)", "minutes": 2, "line_id": "2", "line_name": "2호선",
+     "from_station": {"station_id": 3, "station_name": "강남"}, "to_station": {"station_id": 5, "station_name": "교대(법원, 검찰청)"}, "stops": 1},
+    {"kind": "TRANSFER", "label": "교대(법원, 검찰청)에서 2호선 → 3호선 환승", "minutes": 5,
+     "station": {"station_id": 5, "station_name": "교대(법원, 검찰청)"}, "from_line_id": "2", "to_line_id": "3"},
+    {"kind": "RIDE", "label": "3호선 교대(법원, 검찰청) → 종로3가", "minutes": 2, "line_id": "3", "line_name": "3호선",
+     "from_station": {"station_id": 5, "station_name": "교대(법원, 검찰청)"}, "to_station": {"station_id": 7, "station_name": "종로3가"}, "stops": 1}
+  ],
+  "elevator_warning": {
+    "status": "WARNING",
+    "items": [
+      {"station_id": 3, "station_name": "강남", "kind": "UNAVAILABLE", "message": "확인된 엘리베이터가 모두 가동 안됨"},
+      {"station_id": 5, "station_name": "교대(법원, 검찰청)", "kind": "PARTIAL", "message": "일부 엘리베이터가 가동 안됨"}
+    ],
+    "message": "경로 위 일부 역에서 엘리베이터가 가동 안됨이거나 일부만 가동중임"
+  },
+  "limitations": [
+    "소요 시간은 역 간 이동과 환승에 고정 시간을 가정한 추정값이며 실제 열차 시간표와 다를 수 있음",
+    "역 간 연결은 열차 시간표에서 추출한 것이며 공식 인접역 자료로 검증되지 않음",
+    "엘리베이터만으로 이동할 수 있는 환승·출입 동선인지는 검증되지 않음"
+  ]
+}
+```
+
+| 필드 | 설명 |
+|---|---|
+| `stations[]` | 경로 순서의 역. 환승해도 같은 역은 한 번만 나온다. `lines`는 역이 지나는 전체 노선, `station_status`는 6.2절 규칙의 역 상태다 |
+| `stations[].is_transfer` | 이 역에서 노선을 갈아타면 `true` |
+| `transfer_count` | 환승 횟수 |
+| `total_minutes` | `timeline[].minutes`의 합. **추정값**이다 |
+| `timeline[]` | 연속한 같은 노선 이동은 `RIDE` 하나로 묶는다(`stops`는 역 간 구간 수). 환승은 `TRANSFER`다. `RIDE`에는 `line_id`, `from_station`, `to_station`, `stops`가, `TRANSFER`에는 `station`, `from_line_id`, `to_line_id`가 채워지고 나머지 필드는 `null`이다 |
+| `elevator_warning.status` | `WARNING`(가동 안됨·일부 가동 안됨 역이 있음), `UNCONFIRMED`(경고는 없지만 확인하지 못했거나 일부만 확인된 역이 있음), `CLEAR`(경로 위 모든 역이 확인된 설비 기준으로 모두 가동중) |
+| `elevator_warning.items[]` | 경로 순서로 주의가 필요한 역만 담는다. `kind`는 `UNAVAILABLE`, `PARTIAL`, `UNCONFIRMED`. `CLEAR`면 `[]` |
+| `limitations` | 추정 문구는 항상, 시간표 추출·임시 간선 문구는 해당 간선을 쓴 경우만, 접근성 미검증 문구는 항상. 1호선 역이 포함되면 0.4절 문구가 추가된다 |
+
+- **정보가 없는 역을 정상으로 추정하지 않는다.** 설비 정보가 없거나 오래된 역은 `UNCONFIRMED`다. `CLEAR`도 "이용 가능"이 아니라 "확인된 설비 기준"이라고 쓴다(6.3절).
+
+**오류.** 0.6절 형식이다.
+
+| 상황 | 상태 | `error.code` |
+|---|---|---|
+| `from` 또는 `to`가 없거나 정수가 아님 | 422 | `VALIDATION_ERROR` |
+| 출발역과 도착역이 같음 | 422 | `VALIDATION_ERROR` |
+| 0 이하이거나 없는 역 | 404 | `NOT_FOUND` |
+| 두 역을 잇는 경로가 없음(연결 데이터가 끊긴 경우 포함) | 404 | `NOT_FOUND` |
+
 ## 9. 실제 데이터에서 확인되지 않은 항목 (미검증)
 
 | 항목 | 현재 상태 |
@@ -586,7 +677,9 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 | 1호선 구간 | 현재 시드에는 1호선 10개 역만 있다. 나머지 구간은 별도 조사 대상이며 미확보다. 1~8호선 전체를 확보했다는 뜻이 아니다 (`data/seed/SOURCES.md`) |
 | 환승 관계 | 공식 환승 기록(OA-13290)으로 확인된 34개 그룹만 한 역으로 합친다(서울역은 근거를 검증한 수동 확정). 그 밖의 역은 노선별로 따로 있으며 `is_transfer`는 `false`다. 시드에 없는 1호선 역의 환승은 확인하지 못했다 (`data/seed/SOURCES.md`) |
 | 역 좌표 | 출처 미정. `latitude`, `longitude`는 `null`일 수 있다 |
-| 설비 노선 소속 | OA-15994에 노선 컬럼이 없다. 응답에 노선 필드를 넣지 않는다 |
+| 설비 노선 소속 | OA-15994에 노선 컬럼이 없다. 설비의 노선은 알 수 없고, 상태 목록의 `lines`는 설비가 속한 **역**의 노선이다 |
+| 인접 간선 | 공식 인접역 자료가 없다. 열차 시간표(OA-101)에서 같은 열차의 정차 순서로 추출한다(급행 제외, 2대 이상 확인). 시간표의 `WEEK_TAG`·`INOUT_TAG` 의미는 추정이다 |
+| 경로 소요 시간 | 역 간 2분·환승 5분은 가정이다. 실제 시간표나 도보 환승 시간이 아니다 |
 | `observed_at` | OA-15994 응답에 원본 측정 시각이 없다. 현재 항상 `null`이다 |
 | 갱신 주기 | "매시"는 공공데이터 설명 기준이며 응답으로 확인하지 못했다 |
 | TTL | 기본 120분(임시, 설정 가능, 1~1440분). 갱신 주기 미검증 (D1) |
@@ -615,6 +708,11 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 | D11 | 1호선 커버리지 | 1호선은 일부 구간만 확보했으므로 1호선 역이 포함된 응답의 `limitations`에 이를 명시 | 0.4절, 9절 |
 | D12 | 역 상세의 0 이하 ID | `station_id`가 0 이하이면 404 `NOT_FOUND`. 정수가 아니면 422 `VALIDATION_ERROR` 유지 | 3.4절 |
 | D13 | 좌표 `null` | 좌표가 확인되지 않은 역은 `latitude`, `longitude`를 `null`로 반환하고 임의로 채우지 않음 | 3.2절, 3.3절 |
+| D14 | 서울 열린데이터광장 HTTP | 문서화된 주소가 HTTP(8088)뿐이므로 평문 HTTP를 기본 허용한다(2026-11-14). 키는 서버 `.env`에만 두고 로그·오류에는 가린다 | README |
+| D15 | `buffer_minutes` 기본값 | 0분에서 **5분**으로 변경(2026-11-14). FE와 챗봇이 같은 출발 시각을 말하도록 BE 한 곳에서 정한다 | 8.2절 |
+| D16 | 인접 간선 출처 | 열차 시간표(OA-101)에서 같은 열차의 정차 순서로 추출해 `station_edges`에 저장한다(2026-11-14). 요청마다 계산하지 않는다 | 8.4절, 9절 |
+| D17 | 출발 시각 API의 이동 시간 | `travel_minutes`는 외부 입력을 유지한다. 역 id를 주면 경로 위 모든 역의 엘리베이터 경고를 계산한다(2026-11-14) | 8.2절 |
+| D18 | 상태 목록의 노선 | `line` 필터와 `lines` 필드를 추가한다. 역이 지나는 노선이며 설비의 노선이 아니다(2026-11-14, AI 요청) | 5절 |
 
 ### 10.2 FE/AI 검토가 필요한 항목
 

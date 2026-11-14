@@ -7,6 +7,7 @@ from app.models.station_edges import StationEdge
 from app.models.station_external_ids import StationExternalId
 from app.models.station_lines import StationLine
 from app.models.stations import Station
+from app.models.train_schedules import TrainSchedule
 
 __all__ = [
     "Line",
@@ -16,4 +17,5 @@ __all__ = [
     "StationEdge",
     "Elevator",
     "ElevatorStatus",
+    "TrainSchedule",
 ]

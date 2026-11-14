@@ -60,8 +60,8 @@ def test_expected_tables_exist(engine):
     # 만들지 않기로 한 테이블이 없는지 확인
     for name in ("train_arrivals", "station_access_times", "departure_calculations", "elevator_source_ids"):
         assert name not in tables
-    # train_schedules는 OA-101 검증 후 생성하기로 보류했다
-    assert "train_schedules" not in tables
+    # train_schedules는 OA-101 확인 후 추가했다(c4a91f27e6b3)
+    assert "train_schedules" in tables
 
 
 def test_models_match_migration(engine):

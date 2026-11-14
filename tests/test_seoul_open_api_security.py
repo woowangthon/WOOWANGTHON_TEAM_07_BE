@@ -189,18 +189,18 @@ def test_non_json_response_exposes_no_key():
     assert KEY not in everything_about(info.value)
 
 
-# ---------- 3. 평문 HTTP 기본 차단과 네트워크 격리 ----------
+# ---------- 3. 평문 HTTP 차단 옵션과 네트워크 격리 ----------
 
 
-def test_plain_http_is_rejected_before_any_connection(block_external_network, monkeypatch):
+def test_plain_http_is_rejected_before_any_connection_when_blocked(block_external_network, monkeypatch):
     attempted = []
     real = socket.socket.connect
     monkeypatch.setattr(socket.socket, "connect", lambda self, addr, *a, **k: (attempted.append(addr), real(self, addr, *a, **k))[1])
 
     with pytest.raises(SeoulOpenApiConfigError, match="평문 HTTP"):
-        SeoulOpenApiClient(KEY)  # 기본 base_url
+        SeoulOpenApiClient(KEY, allow_insecure_http=False)  # 기본 base_url
     with pytest.raises(SeoulOpenApiConfigError, match="평문 HTTP"):
-        SeoulOpenApiClient(KEY, base_url="http://openapi.seoul.go.kr:8088")
+        SeoulOpenApiClient(KEY, base_url="http://openapi.seoul.go.kr:8088", allow_insecure_http=False)
 
     assert attempted == [] and block_external_network == []
 

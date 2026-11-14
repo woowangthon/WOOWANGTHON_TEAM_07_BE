@@ -28,3 +28,19 @@ ARR_NOT_CONFIGURED = "실시간 도착 정보 출처가 연동되지 않아 도�
 ARR_PROVIDER_FAILED = "실시간 도착 정보를 가져오지 못해 도착 시각을 확인하지 못함"
 ARR_EMPTY = "조회 시점에 도착 예정 열차 정보가 없음(운행 종료인지 정보 미제공인지는 구분되지 않음)"
 ARR_SNAPSHOT = "조회 시점 기준의 도착 정보이며 이후 달라질 수 있음"
+
+# 경로 API(#37)와 엘리베이터 경고 문구. 계약 8.4절.
+ROUTE_ESTIMATED = "소요 시간은 역 간 이동과 환승에 고정 시간을 가정한 추정값이며 실제 열차 시간표와 다를 수 있음"
+ROUTE_EDGE_TIMETABLE = "역 간 연결은 열차 시간표에서 추출한 것이며 공식 인접역 자료로 검증되지 않음"
+ROUTE_EDGE_PROVISIONAL = "일부 역 간 연결은 공식 근거가 없는 임시 데이터임"
+ROUTE_ACCESSIBILITY_UNVERIFIED = "엘리베이터만으로 이동할 수 있는 환승·출입 동선인지는 검증되지 않음"
+ROUTE_NOT_FOUND = "두 역을 잇는 경로를 찾을 수 없습니다."
+ROUTE_SAME_STATION = "출발역과 도착역이 같습니다."
+
+WARN_WARNING = "경로 위 일부 역에서 엘리베이터가 가동 안됨이거나 일부만 가동중임"
+WARN_UNCONFIRMED = "경로 위 일부 역의 엘리베이터 상태를 확인하지 못해 경로 전체를 단정할 수 없음"
+WARN_CLEAR = "확인된 설비 기준으로 경로 위 모든 역의 엘리베이터가 가동중임"
+WARN_ITEM_UNAVAILABLE = "확인된 엘리베이터가 모두 가동 안됨"
+WARN_ITEM_PARTIAL = "일부 엘리베이터가 가동 안됨"
+WARN_ITEM_UNCONFIRMED = "엘리베이터 상태를 확인하지 못했거나 일부만 확인됨"
+WARN_NO_ROUTE_STATIONS = "경로를 찾지 못해 엘리베이터 경고를 확인하지 못함"

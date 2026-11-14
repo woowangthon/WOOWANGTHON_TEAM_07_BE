@@ -149,7 +149,9 @@ def test_check_writable_rejects_when_a_parent_is_a_file(tmp_path):
         check_writable(blocker / "logs" / "issues.jsonl")
 
 
-@pytest.mark.skipif(os.geteuid() == 0, reason="root는 권한 검사를 우회한다")
+@pytest.mark.skipif(
+    os.name == "nt" or os.geteuid() == 0, reason="Windows는 chmod 권한 검사를 하지 않고, root는 우회한다"
+)
 def test_check_writable_rejects_a_read_only_directory(tmp_path):
     directory = tmp_path / "ro"
     directory.mkdir()
