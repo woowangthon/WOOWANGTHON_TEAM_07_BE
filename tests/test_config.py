@@ -72,3 +72,35 @@ def test_alternative_search_depth_rejects_out_of_range(monkeypatch: pytest.Monke
     monkeypatch.setenv("ALTERNATIVE_SEARCH_DEPTH", value)
     with pytest.raises(Exception):
         Settings(_env_file=None)
+
+
+# ---------- 출발 권장 시각 추정 기본값 ----------
+
+_DEPARTURE_ENVS = [
+    ("WALK_TO_STATION_MINUTES", "walk_to_station_minutes", 7),
+    ("STATION_ENTRY_MINUTES", "station_entry_minutes", 3),
+    ("EXIT_WALK_MINUTES", "exit_walk_minutes", 3),
+]
+
+
+@pytest.mark.parametrize(("env", "attr", "default"), _DEPARTURE_ENVS)
+def test_departure_segment_defaults_and_override(monkeypatch: pytest.MonkeyPatch, env, attr, default) -> None:
+    monkeypatch.delenv(env, raising=False)
+    assert getattr(Settings(_env_file=None), attr) == default
+    monkeypatch.setenv(env, "15")
+    assert getattr(Settings(_env_file=None), attr) == 15
+
+
+@pytest.mark.parametrize(("env", "attr", "default"), _DEPARTURE_ENVS)
+@pytest.mark.parametrize("value", ["0", "120"])
+def test_departure_segment_accepts_inclusive_bounds(monkeypatch: pytest.MonkeyPatch, env, attr, default, value) -> None:
+    monkeypatch.setenv(env, value)
+    assert getattr(Settings(_env_file=None), attr) == int(value)
+
+
+@pytest.mark.parametrize(("env", "attr", "default"), _DEPARTURE_ENVS)
+@pytest.mark.parametrize("value", ["-1", "121", "abc", "3.5"])
+def test_departure_segment_rejects_out_of_range(monkeypatch: pytest.MonkeyPatch, env, attr, default, value) -> None:
+    monkeypatch.setenv(env, value)
+    with pytest.raises(Exception):
+        Settings(_env_file=None)
