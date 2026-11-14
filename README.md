@@ -124,6 +124,25 @@ DATABASE_URL=sqlite:////tmp/elevator-demo-XXXX/demo.db uv run uvicorn app.main:a
 - 출력은 임시 디렉터리만 허용한다(저장소 안, 비어 있지 않은 디렉터리는 거부). `demo_manifest.json`에 구성·한계가 기록된다.
 - 실제 `data/dev.db` 적재는 별도 승인 사항이다.
 
+## 공공데이터 갱신 실행 방식 (#44)
+
+**결정(2026-11-14): MVP에서는 수동 CLI로 실행한다.**
+
+| 옵션 | 선택 여부 | 근거 |
+|---|---|---|
+| 수동 CLI | **선택** | 단순하고, HTTPS 주소가 확인되지 않아 자동화 전에 1회 수동 검증이 필요하다 |
+| GitHub Actions `workflow_dispatch` | 보조 수단 | 수동 CLI를 Actions에서 실행하는 래퍼. 정기 스케줄 없음. 기본 dry-run |
+| 로컬 `cron`/`launchd` | 보류 | 호스팅이 정해지지 않아 판단 보류 |
+| Actions `schedule` | 보류 | HTTPS 주소·호출 한도 미확인, 배포 미완 |
+
+**지금 할 수 없는 것:** OA-15994의 HTTPS 주소가 확인되지 않아 실제 외부 호출을 실행하지 않았다. 완료 기준 "1회 실행 성공"은 HTTPS 주소 확인 후에 달성 가능하다.
+
+**실행 이력 확인:** 수집 후 `data/logs/ingestion_issues.jsonl`에 `run_id`별로 결과가 쌓인다. `--json`으로 JSON 요약을 얻을 수 있다.
+
+**GitHub Actions 수동 실행:** Actions → "Collect elevator data (OA-15994)" → "Run workflow". `dry_run=true`(기본)이면 DB를 바꾸지 않는다. `dry_run=false` + `DATABASE_URL` Secret 설정으로 Actions 환경의 복사본 DB에 반영할 수는 있지만, **Actions 컨테이너의 파일시스템은 임시 파일시스템이다**. 워크플로가 끝나면 모든 파일이 사라지므로, 여기서 쓴 DB는 운영 DB에 반영되지 않는다. 실제 운영 DB를 갱신하려면 영속 저장소(외부 DB, 오브젝트 스토리지 등)를 별도로 구성해야 하며 현재는 그런 구성이 없다.
+
+---
+
 ## 엘리베이터 수집 CLI (OA-15994)
 
 서울 열린데이터광장 OA-15994 응답에서 엘리베이터(EV)만 골라 `elevators`, `elevator_status`에 Upsert한다.

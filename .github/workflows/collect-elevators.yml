@@ -1,0 +1,75 @@
+name: Collect elevator data (OA-15994)
+
+# 수동 실행 전용. 정기 스케줄은 비활성이다.
+# - HTTPS 주소와 호출 한도가 검증되지 않아 자동 실행을 활성화하지 않는다.
+# - 실제 반영은 dry_run을 false로 바꾸고 DATABASE_URL을 지정했을 때만 한다.
+# - API 키는 저장소에 두지 않고 Actions Secret으로만 관리한다.
+#
+# 사용법:
+#   Actions → "Collect elevator data (OA-15994)" → "Run workflow"
+#   dry_run을 true(기본)로 두면 DB를 바꾸지 않고 무엇이 바뀔지만 출력한다.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "dry_run=true: DB를 바꾸지 않고 미리 보기만 한다(기본값이며 권장)"
+        type: boolean
+        default: true
+        required: false
+      base_url:
+        description: "OA-15994 HTTPS base URL (예: https://...). 비워 두면 실행 준비 오류로 종료."
+        type: string
+        default: ""
+        required: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read  # DB는 Actions 환경의 임시 복사본에만 접근한다.
+
+    env:
+      # 실제 반영 시 DATABASE_URL을 Actions Secret으로 주입한다.
+      # 비어 있으면 기본값(./data/dev.db)을 사용하지만, 파일 모드가 아닌 경우에만 허용된다.
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SEOUL_OPEN_API_KEY: ${{ secrets.SEOUL_OPEN_API_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run alembic migration
+        run: uv run alembic upgrade head
+        # DATABASE_URL이 없으면 기본 data/dev.db(체크아웃된 복사본)에 마이그레이션한다.
+
+      - name: Collect elevators (dry-run or apply)
+        id: collect
+        env:
+          # inputs.base_url을 셸에 직접 보간하지 않고 환경 변수로 전달해 셸 삽입을 방지한다.
+          INPUT_BASE_URL: ${{ inputs.base_url }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          # ⚠️ GitHub Actions 임시 파일시스템 주의:
+          #    여기서 접근하는 DB는 체크아웃된 복사본이다. 실제 운영 DB가 아니다.
+          #    DATABASE_URL Secret을 지정해도 Actions 컨테이너에만 반영되고
+          #    컨테이너가 종료되면 사라진다. 운영 DB에 반영하려면 별도의 영속 저장소가 필요하다.
+          ARGS=""
+          if [ -n "$INPUT_BASE_URL" ]; then
+            ARGS="--base-url $INPUT_BASE_URL"
+          fi
+          if [ "$INPUT_DRY_RUN" = "false" ]; then
+            ARGS="$ARGS --apply"
+            echo "⚠️  --apply 모드: DB에 실제 반영한다."
+          else
+            echo "ℹ️  dry-run 모드: DB를 바꾸지 않는다."
+          fi
+          uv run python -m app.cli.collect_elevators --json $ARGS
+        # API 키는 로그에 출력되지 않는다(CLI 내부 보안 규칙).
+        # 종료 코드: 0=정상, 1=데이터 오류, 2=준비 오류, 3=API 오류, 4=부분 성공.
