@@ -16,7 +16,7 @@
 | Method | Path | 용도 | 비고 |
 |---|---|---|---|
 | GET | `/health` | 서버 확인 | `{"status":"ok"}` |
-| GET | `/api/stations?q=&line=` | 역 검색 | `q` 1~20자 필수(전체 목록 불가, 미결정), `line` 1~8 선택. 역명 부분 일치, `station_name`에 괄호 부제가 있을 수 있음(예: `교대(법원, 검찰청)`) |
+| GET | `/api/stations?q=&line=` | 역 검색 | `q` 선택(생략 시 전체 역 목록, 주면 1~20자, 빈 값 `q=`는 422), `line` 1~8 선택. 예: `GET /api/stations?line=2`. 역명 부분 일치, `station_name`에 괄호 부제가 있을 수 있음(예: `교대(법원, 검찰청)`) |
 | GET | `/api/stations/{station_id}` | 역 상세 | |
 | GET | `/api/stations/{station_id}/elevators` | 역별 엘리베이터와 역 상태 | `station_status.status`: AVAILABLE/PARTIAL/UNAVAILABLE/null |
 | GET | `/api/elevators/status?status=&line=` | 전체 설비 상태 | `status`: `가동중` 또는 `가동 안됨`, `line`: 1~8. 각 설비에 `lines`(역이 지나는 전체 노선) |
