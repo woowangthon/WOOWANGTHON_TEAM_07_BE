@@ -26,6 +26,7 @@ from app.cli.collect_elevators import (
     main,
 )
 from app.clients.seoul_open_api import (
+    DEFAULT_BASE_URL,
     FetchResult,
     SeoulOpenApiConfigError,
     SeoulOpenApiResponseError,
@@ -41,6 +42,7 @@ SAMPLE = ROOT / "docs" / "samples" / "OA-15994_SeoulMetroFaciInfo_2026-11-13.jso
 SEED = ROOT / "data" / "seed"
 KEY = "FAKEKEY-abc123XYZ"
 HTTPS = "https://mock.test"
+SKIP_SYMLINK = pytest.mark.skipif(os.name == "nt", reason="Windows는 관리자 권한 없이 심볼릭 링크를 만들 수 없다")
 T1 = "2030-01-01T03:00:00Z"  # 시험용 임의 시각
 T2 = "2030-01-01T04:00:00Z"
 CLOCK_T1 = lambda: datetime(2030, 1, 1, 3, 0, 0, tzinfo=timezone.utc)  # noqa: E731
@@ -429,38 +431,31 @@ def test_missing_key_is_not_ready(world, invoke):
     assert result.calls == []
 
 
-def test_api_mode_requires_an_explicit_https_address(world, invoke):
+def test_api_mode_without_base_url_uses_the_documented_default_address(world, invoke):
     result = invoke(["--database-url", db_url(world)], rows=[row()])
 
-    assert result.code == EXIT_NOT_READY and "HTTPS" in result.err
-    assert result.calls == [] and result.client.fetched == 0
+    assert result.code == 0
+    assert result.calls == [(KEY, DEFAULT_BASE_URL)]
+
+
+@pytest.mark.parametrize("base_url", ["http://mock.test", "http://openapi.seoul.go.kr:8088"])
+def test_plain_http_addresses_are_allowed(world, invoke, base_url):
+    result = invoke(["--base-url", base_url, "--database-url", db_url(world)], rows=[row()])
+
+    assert result.code == 0
+    assert result.calls == [(KEY, base_url)]
 
 
 @pytest.mark.parametrize(
     "base_url",
-    ["http://mock.test", "http://openapi.seoul.go.kr:8088", "ftp://mock.test", "mock.test", "https://", "https://user:pw@mock.test", "https://mock.test?x=1", "https://mock.test#f"],
+    ["ftp://mock.test", "mock.test", "https://", "https://user:pw@mock.test", "https://mock.test?x=1", "https://mock.test#f"],
 )
-def test_plain_http_and_malformed_addresses_are_rejected_before_any_call(world, invoke, base_url):
+def test_malformed_addresses_are_rejected_before_any_call(world, invoke, base_url):
     result = invoke(["--base-url", base_url, "--database-url", db_url(world), "--apply"], rows=[row()])
 
     assert result.code == EXIT_NOT_READY
     assert result.calls == [] and result.client.fetched == 0
     assert "pw" not in result.blob  # 주소에 든 정보를 되풀이해 출력하지 않는다
-
-
-def test_cli_does_not_expose_an_insecure_http_option(world, invoke):
-    result = invoke(["--allow-insecure-http", "--base-url", "http://mock.test", "--database-url", db_url(world)], rows=[row()])
-
-    assert result.code == EXIT_NOT_READY and "unrecognized" in result.err
-    assert result.calls == []
-
-
-def test_help_lists_no_insecure_option(capsys):
-    with pytest.raises(SystemExit) as info:
-        main(["--help"])
-
-    assert info.value.code == 0
-    assert "insecure" not in capsys.readouterr().out.lower()
 
 
 def test_client_config_error_is_not_ready(world, invoke):
@@ -821,6 +816,7 @@ def test_relative_paths_are_compared_by_real_location(world, invoke, monkeypatch
 
 
 @BOTH_MODES
+@SKIP_SYMLINK
 def test_symlink_to_the_default_db_is_rejected(world, invoke, monkeypatch, tmp_path, sample_file, apply_flags):
     link = tmp_path / "innocent.db"
     link.symlink_to(world.url.database)
@@ -834,6 +830,7 @@ def test_symlink_to_the_default_db_is_rejected(world, invoke, monkeypatch, tmp_p
 
 
 @BOTH_MODES
+@SKIP_SYMLINK
 def test_symlink_chain_to_the_default_db_is_rejected(world, invoke, monkeypatch, tmp_path, sample_file, apply_flags):
     first = tmp_path / "first.db"
     first.symlink_to(world.url.database)
@@ -849,6 +846,7 @@ def test_symlink_chain_to_the_default_db_is_rejected(world, invoke, monkeypatch,
 
 
 @BOTH_MODES
+@SKIP_SYMLINK
 def test_symlinked_directory_into_the_data_directory_is_rejected(world, invoke, monkeypatch, tmp_path, sample_file, apply_flags):
     fake_data = tmp_path / "data"
     fake_data.mkdir()
@@ -1011,7 +1009,7 @@ def test_json_output_has_the_same_keys_on_failure(world, invoke, args_rows_error
 
 
 def test_json_output_for_usage_errors_is_still_one_json_object(world, invoke):
-    result = invoke(["--json", "--database-url", db_url(world)], rows=[row()])  # HTTPS 주소 없음
+    result = invoke(["--json", "--base-url", "ftp://x.test", "--database-url", db_url(world)], rows=[row()])  # 잘못된 주소
 
     body = result.json()
     assert set(body) == JSON_KEYS and body["exit_code"] == EXIT_NOT_READY and body["error"]["kind"] == "not_ready"

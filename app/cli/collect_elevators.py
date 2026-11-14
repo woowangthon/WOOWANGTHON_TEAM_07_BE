@@ -1,10 +1,9 @@
 """OA-15994 엘리베이터 수집 CLI.
 
-    # 아래 <확인된 HTTPS 주소>는 자리표시자이며 실제 주소가 아니다. 확인된 HTTPS 주소는 아직 없다.
-    # 기본은 dry-run이다. DB와 로그 파일을 바꾸지 않는다.
-    uv run python -m app.cli.collect_elevators --base-url https://<확인된 HTTPS 주소>
+    # 기본은 dry-run이다. DB와 로그 파일을 바꾸지 않는다. 주소를 생략하면 문서화된 기본 주소(HTTP)를 쓴다.
+    uv run python -m app.cli.collect_elevators
     # 실제 반영은 --apply를 명시했을 때만 한다.
-    uv run python -m app.cli.collect_elevators --base-url https://<확인된 HTTPS 주소> --apply
+    uv run python -m app.cli.collect_elevators --apply
     # 저장된 파일로 임시 DB에 적재해 보기 (파일 모드는 --fetched-at이 필수다)
     uv run python -m app.cli.collect_elevators --input-file <파일.json> --fetched-at 2030-01-01T03:00:00Z \\
         --database-url sqlite:////tmp/test.db --apply
@@ -12,13 +11,13 @@
 종료 코드
     0 정상
     1 데이터·적재 오류 (파싱 오류, EV 0건, 전부 미매핑, 매핑 충돌, 과거 fetched_at, DB 잠금 등)
-    2 실행 준비 오류 (인자, 키 없음, HTTPS 주소 없음, DB 미준비, 로그 경로 쓰기 불가, 차단된 조합)
+    2 실행 준비 오류 (인자, 키 없음, 잘못된 주소, DB 미준비, 로그 경로 쓰기 불가, 차단된 조합)
     3 외부 API 오류 (전송, 응답 오류). 기존 DB와 fetched_at은 그대로다.
     4 DB 커밋은 성공했으나 로그 기록에 실패 (부분 성공). 커밋된 DB는 롤백되지 않았다.
 
 안전 규칙
-- API 모드는 HTTPS 주소(--base-url https://...)가 있어야만 실행한다. 평문 HTTP는 허용하지 않으며
-  이를 풀어 주는 옵션을 노출하지 않는다.
+- API 모드의 주소(--base-url)는 http:// 또는 https://다(팀 결정 2026-11-14로 평문 HTTP를 기본 허용).
+  생략하면 문서화된 기본 주소를 쓴다. 사용자 정보·쿼리·프래그먼트가 든 주소는 거부한다.
 - 파일 모드는 --apply 여부와 관계없이(dry-run 포함) 기본 DB와 저장소 data/ 아래 DB에 접근하지 않고,
   임시 디렉터리의 SQLite 파일에서만 동작한다. 경로는 상대 경로, 심볼릭 링크, 하드 링크를 풀어 같은
   파일인지로 검사한다. 이 검사는 DB 엔진을 만들기 전에 한다.
@@ -52,6 +51,7 @@ from sqlalchemy.orm import Session
 from app.clients.oa15994 import SERVICE_NAME, Oa15994ParseError, load_sample_rows, parse_elevators
 from app.clients.seoul_open_api import (
     CODE_NO_DATA,
+    DEFAULT_BASE_URL,
     SeoulOpenApiClient,
     SeoulOpenApiConfigError,
     SeoulOpenApiError,
@@ -128,7 +128,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--apply", action="store_true", help="실제로 DB에 반영한다. 없으면 dry-run이다.")
     parser.add_argument("--database-url", default=None, help="기본값은 설정(DATABASE_URL)의 DB다.")
     parser.add_argument("--input-file", type=Path, default=None, help="파일 모드: 저장된 응답 JSON 파일.")
-    parser.add_argument("--base-url", default=None, help="API 모드: 확인된 HTTPS 주소(https://...).")
+    parser.add_argument("--base-url", default=None, help="API 모드: 서울 열린데이터광장 주소(http:// 또는 https://). 생략하면 기본 주소.")
     parser.add_argument("--fetched-at", default=None, help="파일 모드 필수: UTC 시각 YYYY-MM-DDTHH:MM:SSZ.")
     parser.add_argument("--json", action="store_true", dest="as_json", help="결과를 JSON 한 개로 출력한다.")
     return parser
@@ -234,17 +234,14 @@ def _check_database_ready(engine, database_url: str) -> None:
 # ---------- 입력 ----------
 
 
-def _validate_https_base_url(base_url: str | None) -> str:
+def _validate_base_url(base_url: str | None) -> str:
     if not base_url:
-        raise CliFailure(
-            EXIT_NOT_READY, "not_ready",
-            "API 모드는 확인된 HTTPS 주소(--base-url https://...)가 있어야 실행됩니다. HTTPS 연결이 확인되지 않았다면 사용할 수 없습니다.",
-        )
+        return DEFAULT_BASE_URL
     parts = urlsplit(base_url)
-    if parts.scheme != "https" or not parts.netloc or parts.username or parts.password or parts.query or parts.fragment:
+    if parts.scheme not in ("http", "https") or not parts.netloc or parts.username or parts.password or parts.query or parts.fragment:
         raise CliFailure(
             EXIT_NOT_READY, "not_ready",
-            "--base-url은 사용자 정보와 쿼리가 없는 https:// 주소여야 합니다. 평문 HTTP는 허용되지 않습니다.",
+            "--base-url은 사용자 정보와 쿼리가 없는 http:// 또는 https:// 주소여야 합니다.",
         )
     return base_url
 
@@ -329,7 +326,6 @@ def _fail_all_unmapped(
 
 
 def _default_client_factory(api_key: str, base_url: str) -> SeoulOpenApiClient:
-    # allow_insecure_http는 쓰지 않는다. 기본값(False)이라 http 주소는 클라이언트도 거부한다.
     return SeoulOpenApiClient(api_key, base_url=base_url)
 
 
@@ -378,7 +374,7 @@ def _run(
     else:
         if args.fetched_at:
             raise CliFailure(EXIT_NOT_READY, "usage", "API 모드에서는 --fetched-at을 쓸 수 없습니다(수집 시각은 자동으로 기록됩니다).")
-        base_url = _validate_https_base_url(args.base_url)
+        base_url = _validate_base_url(args.base_url)
         if not api_key.strip():
             raise CliFailure(EXIT_NOT_READY, "not_ready", "API 키가 설정되지 않았습니다.")
         fetched_at = None

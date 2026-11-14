@@ -323,18 +323,23 @@ def test_timeouts_are_5_seconds_to_connect_and_10_to_read():
 # ---------- 설정 검증 ----------
 
 
-def test_plain_http_is_blocked_by_default():
-    with pytest.raises(SeoulOpenApiConfigError, match="평문 HTTP"):
-        SeoulOpenApiClient(KEY)  # 기본 base_url은 http라서 막힌다
-    with pytest.raises(SeoulOpenApiConfigError, match="평문 HTTP"):
-        SeoulOpenApiClient(KEY, base_url="http://example.test")
-    assert api.DEFAULT_BASE_URL.startswith("http://")  # 기본 주소는 평문이므로 명시 허용 없이는 쓸 수 없다
+def test_plain_http_is_allowed_by_default():
+    SeoulOpenApiClient(KEY).close()  # 기본 base_url은 http지만 기본 허용이다(팀 결정 2026-11-14)
+    SeoulOpenApiClient(KEY, base_url="http://example.test").close()
+    assert api.DEFAULT_BASE_URL.startswith("http://")
 
 
-def test_plain_http_requires_explicit_opt_in():
+def test_plain_http_can_be_blocked_explicitly():
+    with pytest.raises(SeoulOpenApiConfigError, match="평문 HTTP"):
+        SeoulOpenApiClient(KEY, allow_insecure_http=False)
+    with pytest.raises(SeoulOpenApiConfigError, match="평문 HTTP"):
+        SeoulOpenApiClient(KEY, base_url="http://example.test", allow_insecure_http=False)
+
+
+def test_plain_http_request_is_sent_over_http():
     server = FakeServer(rows_of(1))
     client = SeoulOpenApiClient(
-        KEY, base_url="http://mock.test:8088", allow_insecure_http=True, transport=httpx.MockTransport(server)
+        KEY, base_url="http://mock.test:8088", transport=httpx.MockTransport(server)
     )
     with client:
         client.fetch_all_rows(SERVICE_NAME)
