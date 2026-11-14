@@ -46,6 +46,8 @@ curl http://127.0.0.1:8000/health
 curl -G http://127.0.0.1:8000/api/stations --data-urlencode "q=서울역"
 curl http://127.0.0.1:8000/api/stations/1/elevators
 curl http://127.0.0.1:8000/api/stations/1/alternatives
+curl "http://127.0.0.1:8000/api/routes?from=1&to=2"
+curl "http://127.0.0.1:8000/api/elevators/status?line=2"
 curl -X POST http://127.0.0.1:8000/api/departure-time -H "Content-Type: application/json" \
   -d '{"arrival_at":"2026-12-01T09:00:00+09:00","travel_minutes":30}'
 curl http://127.0.0.1:8000/api/stations/1/arrivals
@@ -56,8 +58,58 @@ uv run python scripts/demo_check.py
 
 - 자동 문서: 서버 실행 후 `http://127.0.0.1:8000/docs`(Swagger UI).
 - 데모 DB의 샘플 엘리베이터는 과거 응답이라 TTL 기준 **정보 없음(STALE)** 으로 나온다. 정상 응답이다. 합성 상태 5건만 생성 시각 기준으로 잠시 확인 상태가 된다.
-- 서버 기동과 `/health` 응답은 로컬에서 확인했다. **배포 환경(호스팅, HTTPS, 영속 저장소)은 정해지지 않았고 확인하지 않았다.**
-- 외부 API(OA-15994 수집, OA-12764 실시간 도착)는 서버가 호출하지 않는다. 도착 정보는 항상 `UNCONFIRMED`다.
+- 서버 기동과 `/health` 응답은 로컬에서 확인했다. **시연 서버는 집 데스크탑에서 터미널로 실행한다(아래 "시연 서버 실행"). 클라우드 배포는 하지 않았다.**
+- 외부 API(OA-15994, OA-101 수집, OA-12764 실시간 도착)는 서버가 호출하지 않는다. 수집은 CLI로만 한다. 도착 정보는 항상 `UNCONFIRMED`다.
+- 데모 DB는 인접 간선이 잠정(PROVISIONAL)이다. 시연 서버(아래 "시연 서버 실행")는 시간표에서 추출한 간선을 쓴다.
+
+## 시연 서버 실행 (집 데스크탑, 터미널) (#45)
+
+**결정(2026-11-14): 시연 서버는 집 데스크탑에서 터미널로 직접 실행한다.** Docker, Redis, PostgreSQL은 쓰지 않는다. SQLite 파일(`data/dev.db`)을 그대로 쓰고 호스팅·HTTPS·영속 디스크 문제는 없다. 서버는 상주하는 프로세스 1개다.
+
+### 1회 준비 (순서대로)
+
+```bash
+uv sync
+cp .env.example .env            # SEOUL_OPEN_API_KEY와 CORS_ALLOWED_ORIGINS를 채운다. .env는 커밋하지 않는다
+uv run alembic upgrade head     # data/dev.db 생성·마이그레이션
+cp data/dev.db data/dev.db.bak  # 적재 전 백업(서버를 멈춘 상태에서 복사한다)
+
+uv run python -m app.cli.load_seed --dry-run && uv run python -m app.cli.load_seed          # 역·노선 시드
+uv run python -m app.cli.load_edges --apply                                                  # 공식 환승 간선(OA-13290)
+uv run python -m app.cli.collect_elevators --apply                                           # 엘리베이터 상태(OA-15994) 1회
+uv run python -m app.cli.collect_timetable --apply                                           # 열차 시간표(OA-101), 호출 수백 번
+uv run python -m app.cli.derive_edges --apply                                                # 시간표에서 인접 간선 추출
+```
+
+- 각 명령은 `--apply` 없이 실행하면 dry-run이다. 먼저 dry-run으로 건수를 확인한다.
+- 수집 명령은 **외부 API를 호출**하므로 `.env`의 키가 있어야 한다. 주소를 생략하면 문서화된 기본 주소(`http://openapi.seoul.go.kr:8088`)를 쓴다. 평문 HTTP는 팀 결정(2026-11-14)으로 기본 허용이며, 키는 이 PC의 `.env`에만 있고 로그·오류 출력에는 가려진다.
+- `collect_timetable`은 역 x 요일 3 x 방향 2번을 호출한다(역 약 280개면 약 1,700번, 호출당 0.2~0.4초). 일부 역만 시험하려면 `--station-code 0150 --station-code 0222 --day-type WEEKDAY`를 쓴다. **일일 호출 한도는 확인하지 못했다.**
+- `derive_edges`는 시간표에서 같은 열차의 정차 순서로 인접역을 뽑는다(급행 제외, 2대 이상 확인, 시간 차 20분 이하). 공식 인접역 자료가 아니므로 경로 응답의 `limitations`에 그렇게 표시된다.
+- 이 시드·간선·시간표 적재는 **실제 `data/dev.db`를 바꾼다.** 위 백업을 먼저 한다.
+
+### 서버 실행과 점검
+
+```bash
+# 같은 네트워크의 FE가 접근하려면 --host 0.0.0.0. 이 PC에서만 쓰면 생략한다(기본 127.0.0.1)
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+uv run python scripts/demo_check.py     # 점검(로컬 서버만 대상)
+```
+
+- FE가 다른 PC나 다른 포트에서 호출하면 `.env`의 `CORS_ALLOWED_ORIGINS`에 그 Origin(예: `http://192.168.0.10:5173`)을 넣고 서버를 다시 시작한다.
+- 방화벽에서 포트 8000을 열어야 같은 네트워크의 다른 PC가 접근한다. 인증이 없으므로 외부 인터넷에는 열지 않는다.
+- 수집 데이터는 자동으로 갱신되지 않는다. 시연 직전에 `collect_elevators --apply`를 다시 실행한다(서버를 멈출 필요는 없지만 쓰는 순간 잠깐 잠길 수 있다).
+- 시간표와 인접 간선은 자주 바뀌지 않으므로 한 번만 준비하면 된다.
+
+### 시연 전 점검 목록
+
+- [ ] `GET /health`가 `{"status":"ok"}`
+- [ ] `uv run python scripts/demo_check.py`가 `FAIL=0`
+- [ ] 엘리베이터 상태 조회: `GET /api/stations/{id}/elevators`
+- [ ] 고장 목록: `GET /api/elevators/status?status=가동%20안됨&line=2`
+- [ ] 대체역: `GET /api/stations/{id}/alternatives`
+- [ ] 경로: `GET /api/routes?from={id}&to={id}`
+- [ ] 출발 시각: `POST /api/departure-time` (`from_station_id`, `to_station_id` 포함)
+- [ ] FE 화면에서 브라우저 콘솔에 CORS 오류가 없다
 
 ## 테스트
 
@@ -130,12 +182,12 @@ DATABASE_URL=sqlite:////tmp/elevator-demo-XXXX/demo.db uv run uvicorn app.main:a
 
 | 옵션 | 선택 여부 | 근거 |
 |---|---|---|
-| 수동 CLI | **선택** | 단순하고, HTTPS 주소가 확인되지 않아 자동화 전에 1회 수동 검증이 필요하다 |
+| 수동 CLI | **선택** | 단순하고, 시연 PC에서 터미널로 직접 실행한다. 자동화 전에 1회 수동 검증이 필요하다 |
 | GitHub Actions `workflow_dispatch` | 보조 수단 | 수동 CLI를 Actions에서 실행하는 래퍼. 정기 스케줄 없음. 기본 dry-run |
-| 로컬 `cron`/`launchd` | 보류 | 호스팅이 정해지지 않아 판단 보류 |
-| Actions `schedule` | 보류 | HTTPS 주소·호출 한도 미확인, 배포 미완 |
+| 로컬 `cron`/`launchd`·작업 스케줄러 | 보류 | 시연 직전에 수동 실행으로 충분하다. 필요하면 Windows 작업 스케줄러로 같은 명령을 돌린다 |
+| Actions `schedule` | 보류 | 호출 한도 미확인, 영속 저장소 없음(실행이 끝나면 파일이 사라진다) |
 
-**지금 할 수 없는 것:** OA-15994의 HTTPS 주소가 확인되지 않아 실제 외부 호출을 실행하지 않았다. 완료 기준 "1회 실행 성공"은 HTTPS 주소 확인 후에 달성 가능하다.
+**HTTP 허용(2026-11-14):** 문서화된 주소가 HTTP뿐이어서 평문 HTTP를 기본 허용으로 바꿨다. HTTPS 연결은 개발 환경에서 TLS 핸드셰이크가 실패했고 서비스의 HTTPS 지원 여부는 단정하지 못했다. 이 저장소의 CLI는 실제 호출을 아직 실행하지 않았다. 완료 기준 "1회 실행 성공"은 시연 PC에서 `collect_elevators --apply`를 실행하면 달성된다.
 
 **실행 이력 확인:** 수집 후 `data/logs/ingestion_issues.jsonl`에 `run_id`별로 결과가 쌓인다. `--json`으로 JSON 요약을 얻을 수 있다.
 
@@ -147,18 +199,16 @@ DATABASE_URL=sqlite:////tmp/elevator-demo-XXXX/demo.db uv run uvicorn app.main:a
 
 서울 열린데이터광장 OA-15994 응답에서 엘리베이터(EV)만 골라 `elevators`, `elevator_status`에 Upsert한다.
 
-> **현재 실제 API 호출은 사용할 수 없다.** 문서화된 주소(`http://openapi.seoul.go.kr:8088/...`)는 평문 HTTP이고 API 키가 URL에 들어간다. 개발 환경에서 HTTPS 연결은 확인되지 않았다(연결 실패 기록이며 지원 여부를 단정하지 않는다). 이 명령은 **HTTPS 주소를 `--base-url`로 명시했을 때만** API를 호출하며, 평문 HTTP를 허용하는 옵션은 없다. 확인되기 전에는 아래 파일 모드와 테스트만 쓴다.
->
-> 아래 예시의 `https://<확인된 HTTPS 주소>`는 **자리표시자이며 실제 주소가 아니다.** 사용할 수 있다고 확인된 HTTPS 주소는 아직 없고, 이 문서와 코드는 확인된 HTTPS 주소를 담고 있지 않다(위에 언급한 평문 `http://` 주소는 문서화된 원본 주소일 뿐 이 명령으로는 쓸 수 없다). 그대로 복사해 실행하지 않는다.
+> **평문 HTTP를 기본 허용한다(팀 결정 2026-11-14).** 문서화된 주소(`http://openapi.seoul.go.kr:8088/...`)는 평문 HTTP이고 API 키가 URL에 들어간다. `--base-url`을 생략하면 이 기본 주소를 쓰고, `http://`와 `https://` 주소를 모두 받는다. 키는 `.env`에만 두고 stdout·stderr·로그·예외 메시지에는 가려서 남긴다. 사용자 정보·쿼리·프래그먼트가 든 주소는 거부한다.
 
 ### 기본은 dry-run
 
 ```bash
 # DB와 로그 파일을 바꾸지 않고 무엇이 바뀔지만 보여 준다 (--apply 없음)
-uv run python -m app.cli.collect_elevators --base-url https://<확인된 HTTPS 주소>
+uv run python -m app.cli.collect_elevators
 
 # 실제 반영은 --apply를 명시했을 때만 한다
-uv run python -m app.cli.collect_elevators --base-url https://<확인된 HTTPS 주소> --apply
+uv run python -m app.cli.collect_elevators --apply
 ```
 
 - API 키는 `.env`의 `SEOUL_OPEN_API_KEY`에서만 읽고 출력하지 않는다. 요청 URL도 출력하지 않는다.
@@ -198,7 +248,7 @@ uv run python -m app.cli.collect_elevators \
 |---|---|
 | 0 | 정상 |
 | 1 | 데이터·적재 오류 (파싱 오류, EV 0건, 전부 미매핑, 매핑 충돌, 과거 `fetched_at`, DB 잠금) |
-| 2 | 실행 준비 오류 (인자, 키 없음, HTTPS 주소 없음, DB 미준비, 로그 경로 쓰기 불가, 차단된 조합) |
+| 2 | 실행 준비 오류 (인자, 키 없음, 잘못된 주소, DB 미준비, 로그 경로 쓰기 불가, 차단된 조합) |
 | 3 | 외부 API 오류 |
 | 4 | DB 커밋 성공 후 로그 기록 실패 |
 

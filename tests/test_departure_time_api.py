@@ -22,8 +22,15 @@ UTC = timezone.utc
 FIXED_NOW = datetime(2026, 11, 13, 0, 0, 0, 123456, tzinfo=UTC)  # 마이크로초가 있어도 동작해야 한다
 
 
+class _GuardSession:
+    """세션을 받아도 쓰는 순간 실패한다. 역 id가 없는 요청은 DB를 쓰지 않아야 한다."""
+
+    def __getattr__(self, name):
+        raise AssertionError("역 id가 없는 요청은 DB를 쓰지 않는다")
+
+
 def forbid_db():
-    raise AssertionError("이 API는 DB를 쓰지 않는다")
+    yield _GuardSession()
 
 
 @pytest.fixture
@@ -71,11 +78,18 @@ def test_response_fields_match_contract(client):
     json.dumps(body, ensure_ascii=False)
 
 
-def test_buffer_defaults_to_zero_and_segment_overrides_apply(client):
+def test_buffer_defaults_to_five_and_segment_overrides_apply(client):
     body = post(client, walk_to_station_minutes=15, station_entry_minutes=0, exit_walk_minutes=5).json()
 
+    assert body["inputs"]["buffer_minutes"] == 5
+    assert body["total_minutes"] == 15 + 0 + 5 + 30 + 5
+    assert body["defaults_applied"] == ["buffer_minutes"]
+
+
+def test_explicit_zero_buffer_is_not_reported_as_default(client):
+    body = post(client, buffer_minutes=0, walk_to_station_minutes=15, station_entry_minutes=0, exit_walk_minutes=5).json()
+
     assert body["inputs"]["buffer_minutes"] == 0
-    assert body["total_minutes"] == 15 + 0 + 0 + 30 + 5
     assert body["defaults_applied"] == []
 
 
@@ -87,14 +101,14 @@ def test_omitted_segments_use_settings_not_hardcoded_values(client, monkeypatch)
 
     assert body["inputs"]["walk_to_station_minutes"] == 20 and body["inputs"]["exit_walk_minutes"] == 1
     assert body["inputs"]["station_entry_minutes"] == 3
-    assert body["defaults_applied"] == ["walk_to_station_minutes", "station_entry_minutes", "exit_walk_minutes"]
+    assert body["defaults_applied"] == ["buffer_minutes", "walk_to_station_minutes", "station_entry_minutes", "exit_walk_minutes"]
 
 
 def test_null_segment_means_use_the_default(client):
     body = post(client, walk_to_station_minutes=None, exit_walk_minutes=9).json()
 
     assert body["inputs"]["walk_to_station_minutes"] == 7 and body["inputs"]["exit_walk_minutes"] == 9
-    assert body["defaults_applied"] == ["walk_to_station_minutes", "station_entry_minutes"]
+    assert body["defaults_applied"] == ["buffer_minutes", "walk_to_station_minutes", "station_entry_minutes"]
 
 
 def test_timeline_is_contiguous_and_ends_at_arrival(client):
@@ -174,7 +188,7 @@ def test_utc_arrival_that_is_midnight_in_kst(client):
 def test_year_boundary(client):
     body = post(client, arrival_at="2027-01-01T00:05:00+09:00").json()
 
-    assert body["recommended_departure_at"] == "2026-12-31T23:22:00+09:00"
+    assert body["recommended_departure_at"] == "2026-12-31T23:17:00+09:00"  # 기본 대기 5분 포함
 
 
 # ---------- 이미 지난 출발 시각 ----------
@@ -190,8 +204,8 @@ def test_departure_already_past_is_flagged_with_the_server_clock(client):
 
 
 def test_already_past_boundary_equal_to_now_is_not_past(client):
-    # 출발 = 도착 - 43분 = 09:00:00 KST(= 고정 now 00:00:00Z)
-    body = post(client, arrival_at="2026-11-13T09:43:00+09:00").json()
+    # 출발 = 도착 - 48분(기본 대기 5분 포함) = 09:00:00 KST(= 고정 now 00:00:00Z)
+    body = post(client, arrival_at="2026-11-13T09:48:00+09:00").json()
 
     assert body["recommended_departure_at"] == "2026-11-13T09:00:00+09:00"
     assert body["already_past"] is False

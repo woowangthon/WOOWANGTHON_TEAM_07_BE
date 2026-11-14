@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.errors import CODE_NOT_FOUND, AppError
 from app.services.status_messages import GLOBAL_SOME_UNKNOWN
+from app.services.stations import _load_lines
 from app.models import Elevator, ElevatorStatus, Station
 from app.schemas.elevators import (
     ElevatorItem,
@@ -110,7 +111,7 @@ def get_station_elevators(
 
 
 def list_elevator_statuses(
-    session: Session, *, status: str | None, now: datetime, ttl_minutes: int
+    session: Session, *, status: str | None, now: datetime, ttl_minutes: int, line: str | None = None
 ) -> ElevatorStatusListResponse:
     """전체 설비 상태 목록. status를 주면 확인된 설비 중 그 값과 같은 것만 남긴다.
 
@@ -131,10 +132,18 @@ def list_elevator_statuses(
     unknown_count = sum(1 for j in all_judgments if j.unknown_reason is not None)
     limitations = [GLOBAL_SOME_UNKNOWN] if unknown_count > 0 else []
 
+    judgments = all_judgments
     if status is not None:
-        judgments = [j for j in all_judgments if j.status == status]
-    else:
-        judgments = all_judgments
+        judgments = [j for j in judgments if j.status == status]
+
+    # 노선 필터는 판정 뒤에 적용한다. 미확인 설비 수(limitations)는 필터와 무관하게 전체 기준이다.
+    station_ids = sorted({info[j.elevator_id][0].station_id for j in all_judgments})
+    lines_by_station = _load_lines(session, station_ids)
+    if line is not None:
+        judgments = [
+            j for j in judgments
+            if any(ln.line_id == line for ln in lines_by_station[info[j.elevator_id][0].station_id])
+        ]
 
     items = []
     for j in judgments:
@@ -145,6 +154,7 @@ def list_elevator_statuses(
                 elevator_name=elevator.elevator_name,
                 station_id=elevator.station_id,
                 station_name=station_name,
+                lines=lines_by_station[elevator.station_id],
                 status=j.status,
                 data_fresh=j.data_fresh,
                 unknown_reason=j.unknown_reason,

@@ -36,12 +36,16 @@ def read_elevator_statuses(
     status: ElevatorStatusFilter | None = Query(
         None, description="설비 상태 필터. 가동중 또는 가동 안됨. 그 외 값은 422"
     ),
+    line: str | None = Query(
+        None, pattern=r"^[1-8]$", description="노선 필터. 1~8. 그 노선을 지나는 역의 설비만 남긴다. 그 외 값은 422"
+    ),
     session: Session = Depends(get_session),
 ) -> ElevatorStatusListResponse:
     """전체 설비 상태 목록. 확인된 설비만 status 필터에 포함된다."""
     return list_elevator_statuses(
         session,
         status=status,
+        line=line,
         now=utc_now(),
         ttl_minutes=settings.elevator_status_ttl_minutes,
     )
