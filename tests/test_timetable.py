@@ -530,3 +530,63 @@ def test_derive_cli_requires_timetable_then_applies(db_url, mapped, capsys):
     assert "adjacent_created: 2" in capsys.readouterr().out
     mapped.expire_all()
     assert mapped.scalar(select(func.count()).select_from(StationEdge)) == 2
+
+
+def add_stale_derived_edge(db):
+    a, c = sl_id(db, 3), sl_id(db, 6)
+    db.add(StationEdge(from_station_line_id=min(a, c), to_station_line_id=max(a, c), edge_type="ADJACENT", source=SOURCE_TIMETABLE))
+    db.commit()
+    return (min(a, c), max(a, c), "ADJACENT", SOURCE_TIMETABLE)
+
+
+def test_prune_is_refused_when_only_some_stations_are_collected(db_url, mapped, capsys):
+    run_collect(db_url, "--apply", "--station-code", "0222")
+    stale = add_stale_derived_edge(mapped)
+
+    for mode in ("--apply", "--dry-run"):
+        code = derive_edges.main(["--database-url", db_url, mode, "--prune"])
+        out = capsys.readouterr()
+        assert code == derive_edges.EXIT_NOT_READY and "--prune을 거부" in out.err
+        assert "시간표 커버리지: 1/3" in out.out
+
+    mapped.expire_all()
+    assert stale in edges(mapped)
+
+
+def test_prune_is_refused_when_a_day_type_is_missing(db_url, mapped, capsys):
+    run_collect(db_url, "--apply")  # 세 역 모두 있지만 평일 시간표뿐이다
+    stale = add_stale_derived_edge(mapped)
+
+    code = derive_edges.main(["--database-url", db_url, "--apply", "--prune"])
+
+    out = capsys.readouterr()
+    assert code == derive_edges.EXIT_NOT_READY and "시간표 커버리지: 3/3" in out.out and "빠진 요일: SATURDAY, HOLIDAY" in out.out
+    mapped.expire_all()
+    assert stale in edges(mapped)
+
+
+def test_prune_is_allowed_with_full_coverage_and_keeps_other_sources(db_url, mapped, capsys):
+    run_collect(db_url, "--apply")
+    a = sl_id(mapped, 3)
+    add_stops(mapped, "S1", [(a, 6 * 3600)], day="SATURDAY")
+    add_stops(mapped, "H1", [(a, 6 * 3600)], day="HOLIDAY")
+    mapped.add(StationEdge(from_station_line_id=sl_id(mapped, 5, "3"), to_station_line_id=sl_id(mapped, 5), edge_type="TRANSFER", source="OA-13290"))
+    mapped.commit()
+    stale = add_stale_derived_edge(mapped)
+
+    code = derive_edges.main(["--database-url", db_url, "--apply", "--prune"])
+
+    out = capsys.readouterr().out
+    assert code == 0 and "빠진 요일: 없음 -> --prune 허용" in out and "adjacent_pruned: 1" in out
+    mapped.expire_all()
+    assert stale not in edges(mapped)
+    assert {s for *_, s in edges(mapped)} == {SOURCE_TIMETABLE, "OA-13290"}
+
+
+def test_coverage_is_printed_without_prune_even_when_insufficient(db_url, mapped, capsys):
+    run_collect(db_url, "--apply", "--station-code", "0222")
+
+    code = derive_edges.main(["--database-url", db_url])
+
+    out = capsys.readouterr().out
+    assert code == 0 and "시간표 커버리지: 1/3" in out and "--prune 거부 대상" in out
