@@ -71,8 +71,9 @@ def test_response_fields_match_contract(client):
     assert set(body) == {
         "recommended_departure_at", "estimated_boarding_at", "estimated_alighting_at", "arrival_at",
         "total_minutes", "date_changed", "already_past", "estimated", "timetable_used", "inputs",
-        "defaults_applied", "timeline", "elevator_warning", "limitations",
+        "defaults_applied", "timeline", "elevator_warning", "selected_train", "limitations",
     }
+    assert body["selected_train"] is None
     assert set(body["timeline"][0]) == {"kind", "label", "start_at", "end_at", "minutes"}
     assert set(body["elevator_warning"]) == {"status", "items", "message"}
     json.dumps(body, ensure_ascii=False)

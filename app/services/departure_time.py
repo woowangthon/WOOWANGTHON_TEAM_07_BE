@@ -6,8 +6,9 @@
 
 - DB, 네트워크, 파일, 시스템 시계에 접근하지 않는다. 현재 시각(now)은 선택 인자로 주입한다.
 - 경로 탐색을 하지 않는다. 예상 이동 시간은 외부에서 받은 값이다.
-- 실제 열차 시간표를 쓰지 않는다. 그래서 결과는 항상 estimated=True, timetable_used=False이고
-  limitations에 데이터 한계를 담는다. 탑승 가능한 열차를 고르지 않는다.
+- 열차는 고르지 않는다. 시간표로 고른 탑승·하차 시각(boarding_at, alighting_at)을 호출자가 주면 그 시각에 맞추고
+  timetable_used=True로 표시한다. 주지 않으면 외부 입력 이동 시간으로 추정하고 timetable_used=False다.
+  어느 쪽이든 estimated=True이고 limitations에 데이터 한계를 담는다.
 - 시각은 aware datetime만 받는다(naive 거부). 내부 계산은 UTC로 하고, 응답용 변환(to_kst_dict)은
   KST(+09:00) 문자열로 만든다. 날짜가 바뀌어도(자정 이후) 같은 규칙으로 계산한다.
 - 결과를 저장하지 않는다.
@@ -31,8 +32,12 @@ from app.departure_defaults import (
 from app.services.status_messages import (
     DEP_ALREADY_PAST,
     DEP_NO_TIMETABLE,
+    DEP_HOLIDAY_UNKNOWN,
     DEP_SEGMENT_ESTIMATES,
+    DEP_TRAIN_DIRECTION_INFERRED,
+    DEP_TRAIN_SELECTED,
     DEP_TRAVEL_EXTERNAL,
+    DEP_TRAVEL_NOT_USED,
 )
 from app.timeutil import KST, UTC, to_kst_iso
 
@@ -111,6 +116,8 @@ def recommend_departure(
     station_entry_minutes: int = STATION_ENTRY_DEFAULT,
     exit_walk_minutes: int = EXIT_WALK_DEFAULT,
     now: datetime | None = None,
+    boarding_at: datetime | None = None,
+    alighting_at: datetime | None = None,
 ) -> DepartureRecommendation:
     """권장 출발 시각과 타임라인을 계산한다. 잘못된 입력은 ValueError다.
 
@@ -119,6 +126,8 @@ def recommend_departure(
     - buffer_minutes: 필요한 여유 시간(0~240분). 탑승 전에 둔다.
     - walk_to_station_minutes, station_entry_minutes, exit_walk_minutes: 추정값(0~120분).
     - now: 주면 권장 출발 시각이 이미 지났는지 표시한다(aware).
+    - boarding_at, alighting_at: 시간표로 고른 열차의 탑승·하차 시각(둘 다 주거나 둘 다 생략). 주면 이동 구간을
+      이 시각에 맞추고 travel_minutes는 계산에 쓰지 않는다(검증만 한다). 하차 후 출구 이동이 도착 희망 시각을 넘으면 ValueError다.
     """
     arrival = _aware("도착 희망 시각", arrival_at)
     inputs = DepartureInputs(
@@ -129,26 +138,62 @@ def recommend_departure(
         exit_walk_minutes=_minutes("출구 이동 시간", exit_walk_minutes, SEGMENT_MINUTES_MIN, SEGMENT_MINUTES_MAX),
     )
     current = _aware("현재 시각", now) if now is not None else None
-
-    plan = (
-        ("WALK_TO_STATION", "집에서 역까지 도보", inputs.walk_to_station_minutes),
-        ("STATION_ENTRY", "역 진입", inputs.station_entry_minutes),
-        ("BUFFER", "여유 시간", inputs.buffer_minutes),
-        ("RIDE", "열차 이동(외부 입력 예상 시간)", inputs.travel_minutes),
-        ("EXIT_WALK", "출구 이동", inputs.exit_walk_minutes),
-    )
-    total = sum(minutes for _, _, minutes in plan)
-    departure = arrival - timedelta(minutes=total)
+    if (boarding_at is None) != (alighting_at is None):
+        raise ValueError("탑승 시각과 하차 시각은 함께 주어야 합니다.")
+    train_used = boarding_at is not None
 
     steps: list[TimelineStep] = []
-    cursor = departure
-    for kind, label, minutes in plan:
-        end = cursor + timedelta(minutes=minutes)
-        steps.append(TimelineStep(kind=kind, label=label, start_at=cursor, end_at=end, minutes=minutes))
-        cursor = end
+    if train_used:
+        board = _aware("탑승 시각", boarding_at)
+        alight = _aware("하차 시각", alighting_at)
+        if alight <= board:
+            raise ValueError("하차 시각은 탑승 시각보다 늦어야 합니다.")
+        if alight + timedelta(minutes=inputs.exit_walk_minutes) > arrival:
+            raise ValueError("하차 후 출구 이동이 도착 희망 시각을 넘습니다.")
+        before_ride = (
+            ("WALK_TO_STATION", "집에서 역까지 도보", inputs.walk_to_station_minutes),
+            ("STATION_ENTRY", "역 진입", inputs.station_entry_minutes),
+            ("BUFFER", "여유 시간", inputs.buffer_minutes),
+        )
+        departure = board - timedelta(minutes=sum(minutes for _, _, minutes in before_ride))
+        cursor = departure
+        for kind, label, minutes in before_ride:
+            end = cursor + timedelta(minutes=minutes)
+            steps.append(TimelineStep(kind=kind, label=label, start_at=cursor, end_at=end, minutes=minutes))
+            cursor = end
+        steps.append(TimelineStep(
+            kind="RIDE", label="열차 이동(시간표 계획 시각)", start_at=board, end_at=alight,
+            minutes=int(((alight - board).total_seconds() + 30) // 60),  # 반올림(초 단위 시각이라 분 단위로 맞춘다)
+        ))
+        exit_end = alight + timedelta(minutes=inputs.exit_walk_minutes)
+        steps.append(TimelineStep(
+            kind="EXIT_WALK", label="출구 이동", start_at=alight, end_at=exit_end, minutes=inputs.exit_walk_minutes,
+        ))
+        total = sum(step.minutes for step in steps)
+    else:
+        plan = (
+            ("WALK_TO_STATION", "집에서 역까지 도보", inputs.walk_to_station_minutes),
+            ("STATION_ENTRY", "역 진입", inputs.station_entry_minutes),
+            ("BUFFER", "여유 시간", inputs.buffer_minutes),
+            ("RIDE", "열차 이동(외부 입력 예상 시간)", inputs.travel_minutes),
+            ("EXIT_WALK", "출구 이동", inputs.exit_walk_minutes),
+        )
+        total = sum(minutes for _, _, minutes in plan)
+        departure = arrival - timedelta(minutes=total)
+        cursor = departure
+        for kind, label, minutes in plan:
+            end = cursor + timedelta(minutes=minutes)
+            steps.append(TimelineStep(kind=kind, label=label, start_at=cursor, end_at=end, minutes=minutes))
+            cursor = end
 
     already_past = None if current is None else departure < current
-    limitations = [DEP_NO_TIMETABLE, DEP_TRAVEL_EXTERNAL, DEP_SEGMENT_ESTIMATES]
+    if train_used:
+        limitations = [
+            DEP_TRAIN_SELECTED, DEP_TRAIN_DIRECTION_INFERRED, DEP_TRAVEL_NOT_USED,
+            DEP_SEGMENT_ESTIMATES, DEP_HOLIDAY_UNKNOWN,
+        ]
+    else:
+        limitations = [DEP_NO_TIMETABLE, DEP_TRAVEL_EXTERNAL, DEP_SEGMENT_ESTIMATES]
     if already_past:
         limitations.append(DEP_ALREADY_PAST)
 
@@ -161,7 +206,7 @@ def recommend_departure(
         date_changed=departure.astimezone(KST).date() != arrival.astimezone(KST).date(),
         already_past=already_past,
         estimated=True,
-        timetable_used=False,
+        timetable_used=train_used,
         limitations=tuple(limitations),
     )
 

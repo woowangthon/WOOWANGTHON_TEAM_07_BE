@@ -39,9 +39,16 @@ class TimelineStepOut(BaseModel):
     minutes: int
 
 
+class SelectedTrainOut(BaseModel):
+    train_no: str
+    boarding_at: str
+    alighting_at: str
+    direction_inferred: bool = True  # 방향은 시간표 정차 순서로 추정한다
+
+
 class DepartureTimeResponse(BaseModel):
     recommended_departure_at: str
-    estimated_boarding_at: str  # 시간표를 쓰지 않은 추정. 열차 탑승 확정 시각이 아니다
+    estimated_boarding_at: str  # selected_train이 없으면 시간표를 쓰지 않은 추정이다. 어느 쪽이든 탑승 확정 시각이 아니다
     estimated_alighting_at: str  # 위와 같음
     arrival_at: str  # 요청한 도착 희망 시각
     total_minutes: int
@@ -53,4 +60,5 @@ class DepartureTimeResponse(BaseModel):
     defaults_applied: list[str]
     timeline: list[TimelineStepOut]
     elevator_warning: ElevatorWarning
+    selected_train: SelectedTrainOut | None = None  # 시간표로 열차를 고른 경우에만
     limitations: list[str]

@@ -22,6 +22,13 @@ DEP_TRAVEL_EXTERNAL = "예상 이동 시간은 외부에서 입력한 값이며 
 DEP_SEGMENT_ESTIMATES = "도보·역 진입·출구 이동 시간은 추정값이며 개인과 상황에 따라 다를 수 있음"
 DEP_ALREADY_PAST = "추천 출발 시각이 현재 시각보다 이미 지났음"
 DEP_ELEVATOR_UNCONFIRMED = "역·설비 상태 정보가 입력되지 않아 엘리베이터 경고를 확인하지 못함"
+# 시간표 기반 열차 선택(#38). 계약 8.2절.
+DEP_TRAIN_SELECTED = "열차 시간표의 계획 시각으로 탑승 열차를 골랐으며 지연과 실제 운행 여부는 반영되지 않음"
+DEP_TRAIN_DIRECTION_INFERRED = "열차 방향은 시간표의 정차 순서로 추정한 것이며 공식 방향 정보로 검증되지 않음"
+DEP_TRAVEL_NOT_USED = "열차 시간표로 이동 시간을 정해 입력한 예상 이동 시간은 계산에 쓰지 않음"
+DEP_HOLIDAY_UNKNOWN = "공휴일 정보가 없어 요일만으로 평일·토요일·일요일 시간표를 골랐음"
+DEP_TRAIN_NOT_FOUND = "시간표에서 도착 희망 시각에 맞는 열차를 찾지 못해 추정 계산을 사용함"
+DEP_TRAIN_TRANSFER_UNSUPPORTED = "환승이 필요한 경로는 시간표로 열차를 고르지 않고 추정 계산을 사용함"
 
 # 실시간 도착 정보 문구(#40, #41). 계약 8.3절(초안).
 ARR_NOT_CONFIGURED = "실시간 도착 정보 출처가 연동되지 않아 도착 시각을 확인하지 못함"
