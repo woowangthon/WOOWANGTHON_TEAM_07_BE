@@ -3,7 +3,7 @@
 이 레포에서 작업하는 AI 코딩 에이전트(Gemini, Claude, Codex 등)가 **가장 먼저** 읽는 문서다.
 사람용 소개와 실행 방법은 [README.md](README.md)에 있다. 이 문서는 README를 복제하지 않고, "무엇을 지켜야 하고 어디를 봐야 하는가"만 적는다.
 
-> 이 문서는 `main` 5d2b26a(PR #69 머지, 2026-11-14) 기준이다. 시간표·경로 API·대기 5분·Windows 수정이 모두 `main`에 들어 있다. 이후 변경은 **PR #74(OPEN, 리뷰 중, 브랜치 `feat/be-train-selection-edge-fix`)에만 있고 `main`에는 없다**: 순환 종착 시간표 병합, 간선 지지 비율 필터와 `--prune`, 시간표 기반 열차 선택(#38, `selected_train`). **코드와 `docs/api-contract.md`가 현재 사실**이고 이 문서는 길잡이다. 다르면 코드를 믿고, 이 문서를 고친다.
+> 이 문서는 `main` 5ff20c1(PR #82 머지, 2026-11-15) 기준이다. 시간표·경로 API·대기 5분·Windows 수정, 순환 종착 시간표 병합, 간선 지지 비율 필터와 `--prune`, 시간표 기반 열차 선택(#38, `selected_train`, PR #74), 간선 추출 검증(#72), 시간표 수집 무결성(#71), 역 전체 목록(#73)이 모두 `main`에 들어 있다. **코드와 `docs/api-contract.md`가 현재 사실**이고 이 문서는 길잡이다. 다르면 코드를 믿고, 이 문서를 고친다.
 
 ## 1. 이 레포는 무엇인가
 
@@ -110,8 +110,8 @@ uv run python -m app.cli.derive_edges --help          # 시간표에서 인접 �
 
 | 대상 | 관계 |
 |---|---|
-| **AI 레포**(`../AI`) | AI의 `src/data/be_source.py`가 이 API를 호출한다. 현재 읽는 API: `GET /api/stations/{id}`, `/api/stations/{id}/elevators`, `/api/elevators/status`, `/api/stations/{id}/alternatives`, `POST /api/departure-time`. **`GET /api/routes`와 출발 시각의 `from/to` 역 id, 상태 목록의 `line` 필터는 BE에 새로 생겼고 AI는 아직 연동 전이다**(AI 이슈 #6, #12에서 진행 예정). **응답 필드명·상태 값·limitations 문구를 바꾸면 AI의 변환 코드와 테스트 픽스처(`AI/tests/data/fixtures/`)가 깨질 수 있다.** 바꿀 때 PR 본문에 "AI 영향"을 적는다. AI는 `limitations`를 사용자에게 그대로 전달한다. PR #74 머지 후에는 출발 시각 응답에 `selected_train`(기본 `null`)이 추가되고 `timetable_used`가 `true`일 수 있다. AI는 이 필드를 읽지 않지만 `from/to`를 보내지 않아 지금은 켜지지 않는다. AI의 가이드: `../AI/AGENTS.md`, 연동 현황: `../AI/docs/IMPLEMENTATION_STATUS.md` §4.8 |
-| **FE** | `docs/frontend-integration.md`가 기준. CORS는 `CORS_ALLOWED_ORIGINS`에 FE 주소를 넣어야 열린다 |
+| **AI 레포**(`../AI`) | AI의 `src/data/be_source.py`가 이 API를 호출한다. 현재 읽는 API: `GET /api/stations/{id}`, `/api/stations/{id}/elevators`, `/api/elevators/status`, `/api/stations/{id}/alternatives`, `GET /api/routes`, `POST /api/departure-time`(`from_station_id`/`to_station_id`와 경로 `total_minutes`를 `travel_minutes`로 보냄, D17). 출발 시각 응답의 `selected_train`·`timetable_used`·`elevator_warning`도 읽는다(AI 이슈 #6·#12, AI main). 아직 안 쓰는 것: `GET /api/stations` 전체 목록(D19)은 AI가 ID 순차 조회 우회를 아직 쓴다. **응답 필드명·상태 값·limitations 문구를 바꾸면 AI의 변환 코드와 테스트 픽스처(`AI/tests/data/fixtures/`, BE 실제 녹화)가 깨질 수 있다.** 바꿀 때 PR 본문에 "AI 영향"을 적는다. AI는 `limitations`를 사용자에게 그대로 전달하며, 경로 `total_minutes`를 보낸 경우 BE의 "예상 이동 시간은 외부에서 입력한 값이며 경로 탐색으로 검증되지 않음" 문구만 걸러낸다(이 문구를 바꾸면 AI의 걸러내기도 깨진다). **BE에 확인 요청이 와 있다**: 새벽 03:00 도착 요청에 "맞는 열차 없음"이 아니라 막차를 고르는 동작이 의도인지, 운행 종료를 알리는 값이 필요하다(AI는 운행 시간 밖 안내를 못 한다). AI의 가이드: `../AI/AGENTS.md`, 연동 현황: `../AI/docs/IMPLEMENTATION_STATUS.md` §4.8·§4.10 |
+| **FE**(`../FE`) | `docs/frontend-integration.md`가 기준. CORS는 `CORS_ALLOWED_ORIGINS`에 FE 주소를 넣어야 열린다. FE는 아직 `MOCK` 데이터로 동작하고 이 API에 붙어 있지 않다(계약 리뷰 BE #14, 호출 확인 #43이 FE 대기). FE 가이드: `../FE/AGENTS.md`. FE 레포는 다른 팀원이 작업 중이므로 FE 코드·브랜치·이슈를 임의로 고치지 않는다 |
 | 공용 문서 | `../docs/PROJECT-STATE.md`(프로젝트 전체 진행 상황, git 저장소 밖) |
 
 - AI가 BE에서 쓰는 가정: 역 ID는 정수, 괄호 부제가 있는 역명(`잠실(송파구청)`)은 AI가 괄호를 뗀 기본 역명으로 비교한다, 설비 `status`는 `가동중`/`가동 안됨`/`null`.
