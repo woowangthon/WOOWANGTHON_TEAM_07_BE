@@ -139,7 +139,7 @@ DATABASE_URL=sqlite:////tmp/elevator-demo-XXXX/demo.db uv run uvicorn app.main:a
 
 **실행 이력 확인:** 수집 후 `data/logs/ingestion_issues.jsonl`에 `run_id`별로 결과가 쌓인다. `--json`으로 JSON 요약을 얻을 수 있다.
 
-**GitHub Actions 수동 실행:** Actions → "Collect elevator data (OA-15994)" → "Run workflow". `dry_run=true`(기본)이면 DB를 바꾸지 않는다. 실제 반영은 `dry_run=false` + `DATABASE_URL` Secret 설정 필요.
+**GitHub Actions 수동 실행:** Actions → "Collect elevator data (OA-15994)" → "Run workflow". `dry_run=true`(기본)이면 DB를 바꾸지 않는다. `dry_run=false` + `DATABASE_URL` Secret 설정으로 Actions 환경의 복사본 DB에 반영할 수는 있지만, **Actions 컨테이너의 파일시스템은 임시 파일시스템이다**. 워크플로가 끝나면 모든 파일이 사라지므로, 여기서 쓴 DB는 운영 DB에 반영되지 않는다. 실제 운영 DB를 갱신하려면 영속 저장소(외부 DB, 오브젝트 스토리지 등)를 별도로 구성해야 하며 현재는 그런 구성이 없다.
 
 ---
 

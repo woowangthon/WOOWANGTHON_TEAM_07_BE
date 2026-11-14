@@ -51,12 +51,20 @@ jobs:
 
       - name: Collect elevators (dry-run or apply)
         id: collect
+        env:
+          # inputs.base_url을 셸에 직접 보간하지 않고 환경 변수로 전달해 셸 삽입을 방지한다.
+          INPUT_BASE_URL: ${{ inputs.base_url }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
         run: |
+          # ⚠️ GitHub Actions 임시 파일시스템 주의:
+          #    여기서 접근하는 DB는 체크아웃된 복사본이다. 실제 운영 DB가 아니다.
+          #    DATABASE_URL Secret을 지정해도 Actions 컨테이너에만 반영되고
+          #    컨테이너가 종료되면 사라진다. 운영 DB에 반영하려면 별도의 영속 저장소가 필요하다.
           ARGS=""
-          if [ -n "${{ inputs.base_url }}" ]; then
-            ARGS="--base-url ${{ inputs.base_url }}"
+          if [ -n "$INPUT_BASE_URL" ]; then
+            ARGS="--base-url $INPUT_BASE_URL"
           fi
-          if [ "${{ inputs.dry_run }}" = "false" ]; then
+          if [ "$INPUT_DRY_RUN" = "false" ]; then
             ARGS="$ARGS --apply"
             echo "⚠️  --apply 모드: DB에 실제 반영한다."
           else
