@@ -13,19 +13,22 @@ from sqlalchemy.orm import Session
 
 from app.errors import CODE_NOT_FOUND, AppError
 from app.services.status_messages import GLOBAL_SOME_UNKNOWN
-from app.services.stations import _load_lines
-from app.models import Elevator, ElevatorStatus, Station
+from app.services.stations import LINE_1, LINE_1_LIMITATION, _load_lines
+from app.models import Elevator, ElevatorStatus, Station, StationLine
 from app.schemas.elevators import (
     ElevatorItem,
     ElevatorStatusItem,
     ElevatorStatusListResponse,
     StationElevatorsResponse,
     StationRef,
+    StationStatusItem,
+    StationStatusListResponse,
     StationStatusSummary,
 )
 from app.services.status_judgment import (
     ElevatorJudgment,
     ElevatorRef,
+    StationJudgment,
     StatusRow,
     judge_station_without_elevators,
     judge_stations,
@@ -80,6 +83,16 @@ def _elevator_item(judgment: ElevatorJudgment, elevator: Elevator) -> ElevatorIt
     )
 
 
+def _station_summary(judgment: StationJudgment) -> StationStatusSummary:
+    """역 판정을 응답 요약으로 옮긴다. 역별 API와 역 단위 목록이 같이 쓴다."""
+    return StationStatusSummary(
+        status=judgment.status,
+        data_fresh=judgment.data_fresh,
+        total_elevator_count=judgment.total_elevator_count,
+        unknown_elevator_count=judgment.unknown_elevator_count,
+    )
+
+
 def get_station_elevators(
     session: Session, station_id: int, *, now: datetime, ttl_minutes: int
 ) -> StationElevatorsResponse:
@@ -99,12 +112,7 @@ def get_station_elevators(
     by_id = {e.elevator_id: e for e, _, _ in rows}
     return StationElevatorsResponse(
         station=StationRef(station_id=station.station_id, station_name=station.station_name),
-        station_status=StationStatusSummary(
-            status=station_judgment.status,
-            data_fresh=station_judgment.data_fresh,
-            total_elevator_count=station_judgment.total_elevator_count,
-            unknown_elevator_count=station_judgment.unknown_elevator_count,
-        ),
+        station_status=_station_summary(station_judgment),
         limitations=list(station_judgment.limitations),
         elevators=[_elevator_item(j, by_id[j.elevator_id]) for j in station_judgment.elevators],
     )
@@ -163,3 +171,45 @@ def list_elevator_statuses(
             )
         )
     return ElevatorStatusListResponse(elevators=items, count=len(items), limitations=limitations)
+
+
+def list_station_statuses(
+    session: Session, *, line: str | None, now: datetime, ttl_minutes: int
+) -> StationStatusListResponse:
+    """역 단위 상태 목록(지도 색칠용). 판정은 역별 API와 같은 `_judge`·`_station_summary`를 쓴다.
+
+    - 설비가 없는 역도 포함한다(`judge_station_without_elevators`, status null).
+    - line을 주면 그 노선을 지나는 역만 남기고, lines에는 역의 전체 노선을 담는다.
+    - limitations: 전체 설비 중 미확인이 있으면 GLOBAL_SOME_UNKNOWN(필터와 무관, 5.3절과 같은 기준),
+      line=1이거나 결과에 1호선 역이 있으면 LINE_1_PARTIAL(D11).
+    """
+    rows = _elevator_rows(session)
+    judged = {j.station_id: j for j in _judge(rows, now=now, ttl_minutes=ttl_minutes)} if rows else {}
+    unknown_count = sum(j.unknown_elevator_count for j in judged.values())
+
+    stmt = select(Station).order_by(Station.station_id)
+    if line is not None:
+        stmt = stmt.where(
+            Station.station_id.in_(select(StationLine.station_id).where(StationLine.line_id == line))
+        )
+    stations = list(session.scalars(stmt))
+    lines_by_station = _load_lines(session, [s.station_id for s in stations])
+
+    items = [
+        StationStatusItem(
+            station_id=s.station_id,
+            station_name=s.station_name,
+            lines=lines_by_station[s.station_id],
+            station_status=_station_summary(
+                judged.get(s.station_id) or judge_station_without_elevators(s.station_id)
+            ),
+        )
+        for s in stations
+    ]
+
+    limitations: list[str] = []
+    if unknown_count > 0:
+        limitations.append(GLOBAL_SOME_UNKNOWN)
+    if line == LINE_1 or any(ln.line_id == LINE_1 for item in items for ln in item.lines):
+        limitations.append(LINE_1_LIMITATION)
+    return StationStatusListResponse(stations=items, count=len(items), limitations=limitations)

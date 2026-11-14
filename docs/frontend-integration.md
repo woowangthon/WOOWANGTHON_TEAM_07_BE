@@ -18,6 +18,7 @@
 | GET | `/health` | 서버 확인 | `{"status":"ok"}` |
 | GET | `/api/stations?q=&line=` | 역 검색 | `q` 선택(생략 시 전체 역 목록, 주면 1~20자, 빈 값 `q=`는 422), `line` 1~8 선택. 예: `GET /api/stations?line=2`. 역명 부분 일치, `station_name`에 괄호 부제가 있을 수 있음(예: `교대(법원, 검찰청)`) |
 | GET | `/api/stations/{station_id}` | 역 상세 | |
+| GET | `/api/stations/status?line=` | 역 단위 상태 목록(지도 색칠용) | `line` 1~8 선택(그 외 422). 역마다 1건, `station_id` 오름차순, 엘리베이터 없는 역도 포함(`status: null`). `station_status`는 역별 엘리베이터 API와 같은 판정이라 FE가 규칙을 다시 만들지 않는다. `data_fresh: false`·`null` 표시 규칙은 계약 6.2절 그대로. 계약 5.5절(D20) |
 | GET | `/api/stations/{station_id}/elevators` | 역별 엘리베이터와 역 상태 | `station_status.status`: AVAILABLE/PARTIAL/UNAVAILABLE/null |
 | GET | `/api/elevators/status?status=&line=` | 전체 설비 상태 | `status`: `가동중` 또는 `가동 안됨`, `line`: 1~8. 각 설비에 `lines`(역이 지나는 전체 노선) |
 | GET | `/api/stations/{station_id}/alternatives` | 대체역 후보 | 연결 데이터 기준, 접근 가능 여부 미검증 |

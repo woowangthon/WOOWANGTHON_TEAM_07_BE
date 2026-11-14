@@ -60,7 +60,7 @@ uv run python -m app.cli.derive_edges --help          # 시간표에서 인접 �
 
 | 바꾸려는 것 | 파일 | 같이 고칠 것 |
 |---|---|---|
-| 엔드포인트 | `app/routers/*.py`, `app/main.py`(라우터 등록) | `app/schemas/*.py`, `docs/api-contract.md`, `docs/frontend-integration.md` |
+| 엔드포인트 | `app/routers/*.py`, `app/main.py`(라우터 등록). 고정 경로 `/api/stations/status`는 `stations.py`에서 `/{station_id}`보다 먼저 등록(역 단위 상태 목록, 서비스는 `elevator_queries.list_station_statuses`, D20) | `app/schemas/*.py`, `docs/api-contract.md`, `docs/frontend-integration.md` |
 | 응답·요청 모델 | `app/schemas/*.py` | 계약 문서의 필드 표·JSON 예시, 관련 테스트 |
 | 업무 로직 | `app/services/*.py` | 아래 서비스 설명 참고 |
 | 상태 판정(AVAILABLE/PARTIAL/UNAVAILABLE/null, TTL) | `app/services/status_judgment.py`, `app/ttl_limits.py` | 계약 §6, `tests/test_status_judgment.py` |
