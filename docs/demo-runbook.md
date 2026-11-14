@@ -50,7 +50,7 @@ README "1회 준비"의 순서를 따른다. 요약:
 2. **서버를 멈춘 상태에서 `data/dev.db` 백업**
 3. `load_seed` → `load_edges --apply` → `collect_elevators --apply` → `collect_timetable --apply` → `derive_edges --apply`
 4. 모든 단계는 `--apply` 없이 먼저 dry-run으로 건수를 확인한다.
-5. `collect_timetable` 전체는 약 1,700회 호출한다. 처음에는 `--station-code ... --day-type WEEKDAY`로 일부만 시험한다.
+5. `collect_timetable` 전체는 약 1,700회 호출한다. 처음에는 `--station-code ... --day-type WEEKDAY`로 일부만 시험한다. 전체 `--apply` 전에 전체 dry-run을 먼저 돌린다. #71 이후 노선이 없거나 다른 행, 형식이 다른 값(`EXPRESS_YN`이 G·D가 아님, 영숫자가 아닌 열차 번호 등), 저장된 것보다 오래된 `fetched_at`이 하나라도 있으면 적재 전체를 거부한다(종료 코드 1, 기존 데이터 유지). 2026-11-14 전체 수집에서 이런 행이 있었는지는 기록이 없다(미검증). 거부되면 규칙을 완화하지 말고 원인 행을 확인해 팀이 정한다.
 6. 간선을 다시 추출한 뒤 오류 간선을 지우려면 `derive_edges --prune`을 쓰되, **시간표를 전체 수집한 DB에서만** 쓴다(부분 수집 상태에서는 유효한 간선도 지울 수 있다).
 
 ## 5. 영속·백업 (SQLite)

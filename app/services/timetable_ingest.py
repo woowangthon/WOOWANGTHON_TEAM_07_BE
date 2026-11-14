@@ -3,10 +3,13 @@
 - 수집(네트워크)은 DB 쓰기 전에 모두 끝낸다. 하나라도 실패하면 아무것도 쓰지 않는다(기존 데이터 유지).
 - 적재는 한 트랜잭션이다. (역-노선, 요일, 방향) 조합마다 기존 행을 지우고 새로 넣어 재실행해도 늘어나지 않는다.
 - 역 코드는 OA-12035 외부 코드(station_external_ids)로 역-노선 행에 연결한다. 연결되지 않은 코드는 건너뛰고 센다.
-- 응답의 LINE_NUM이 연결된 노선과 다르면 그 행은 건너뛰고 센다.
+- 응답의 LINE_NUM이 없거나 1~8호선이 아니거나 연결된 노선과 다른 행이 하나라도 있으면 전체 적재를 거부한다(#71).
+  일부 행만 건너뛰면 그룹이 부분 스냅샷으로 바뀌기 때문이다. 기존 데이터는 그대로 남는다.
+- fetched_at은 UTC 초 단위(...Z)로 정규화한다. 저장된 그룹보다 오래된 수집으로는 교체하지 않는다(같은 시각은 허용).
 - EXPRESS_YN == "D"는 급행으로 추정한다(미검증). 인접역 추출에서 제외하는 데 쓴다.
 """
 
+import re
 from collections import Counter
 from dataclasses import dataclass, field, replace
 from typing import Any
@@ -25,9 +28,13 @@ from app.services.timetable import (
     line_num_to_line_id,
     time_or_none,
 )
+from app.timeutil import parse_utc_iso, to_utc_iso
 
 SERVICE_NAME = "SearchSTNTimeTableByIDService"
 EXPRESS_FLAG = "D"
+EXPRESS_VALUES = ("G", "D")  # 확인된 값(docs/api-notes.md). 그 외 값은 급행 여부를 알 수 없어 거부한다.
+# 열차 번호·시발/종착 역 코드. 영숫자 1~16자(DB 컬럼 길이). 확인된 예: K1902, 2001, 0150, 1728.
+_IDENTIFIER_PATTERN = re.compile(r"[0-9A-Za-z]{1,16}")
 
 
 @dataclass(frozen=True)
@@ -47,32 +54,75 @@ class TimetableReport:
     counts: Counter = field(default_factory=Counter)
 
 
+def normalize_fetched_at(value: Any) -> str:
+    """fetched_at을 UTC 초 단위 저장 형식(...Z)으로 검증·정규화한다. +00:00은 Z로 바꾼다."""
+    try:
+        return to_utc_iso(parse_utc_iso(value))
+    except ValueError:
+        raise TimetableError(f"fetched_at은 UTC 초 단위 시각(예: 2026-11-14T03:00:00Z)이어야 합니다: {value!r}") from None
+
+
+def _required_text(row: dict[str, Any], name: str, index: int) -> str:
+    if name not in row:
+        raise TimetableError(f"{index + 1}번째 행에 필드가 없습니다: {name}")
+    value = row[name]
+    if not isinstance(value, str):
+        raise TimetableError(f"{index + 1}번째 행의 {name}가 문자열이 아닙니다: {type(value).__name__}")
+    return value
+
+
+def _optional_code(row: dict[str, Any], name: str, index: int) -> str | None:
+    value = row.get(name)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise TimetableError(f"{index + 1}번째 행의 {name}가 문자열이 아닙니다: {type(value).__name__}")
+    value = value.strip()
+    if not value:
+        return None
+    if not _IDENTIFIER_PATTERN.fullmatch(value):
+        raise TimetableError(f"{index + 1}번째 행의 {name} 형식이 올바르지 않습니다: {value!r}")
+    return value
+
+
 def parse_stop_rows(rows: list[dict[str, Any]], station_code: str) -> list[StopRow]:
-    """응답 행을 StopRow로 바꾼다. 필수 필드가 없거나 요청한 역 코드와 다르면 TimetableError다."""
+    """응답 행을 StopRow로 바꾼다. 필수 필드가 없거나 형식·타입이 틀리거나 요청한 역 코드와 다르면 TimetableError다.
+
+    LINE_NUM이 없거나 1~8호선이 아니면 line_id=None으로 두고, 적재(load_timetables)에서 그 그룹째 거부한다.
+    """
+    if not isinstance(rows, list):
+        raise TimetableError(f"응답 행 목록이 배열이 아닙니다: {type(rows).__name__}")
     parsed: list[StopRow] = []
     for index, row in enumerate(rows):
-        try:
-            code = row["STATION_CD"]
-            train_no = str(row["TRAIN_NO"]).strip()
-            arrival = time_or_none(row["ARRIVETIME"])
-            departure = time_or_none(row["LEFTTIME"])
-        except KeyError as exc:
-            raise TimetableError(f"{index + 1}번째 행에 필드가 없습니다: {exc.args[0]}") from None
+        if not isinstance(row, dict):
+            raise TimetableError(f"{index + 1}번째 행이 객체가 아닙니다: {type(row).__name__}")
+        code = _required_text(row, "STATION_CD", index)
+        train_no = _required_text(row, "TRAIN_NO", index).strip()
+        arrival = time_or_none(_required_text(row, "ARRIVETIME", index))
+        departure = time_or_none(_required_text(row, "LEFTTIME", index))
         if code != station_code:
             raise TimetableError(f"{index + 1}번째 행의 STATION_CD({code!r})가 요청한 역 코드와 다릅니다.")
         if not train_no:
             raise TimetableError(f"{index + 1}번째 행의 TRAIN_NO가 비어 있습니다.")
+        if not _IDENTIFIER_PATTERN.fullmatch(train_no):
+            raise TimetableError(f"{index + 1}번째 행의 TRAIN_NO 형식이 올바르지 않습니다: {train_no!r}")
         if arrival is None and departure is None:
             raise TimetableError(f"{index + 1}번째 행에 도착·출발 시각이 모두 없습니다.")
+        line_num = row.get("LINE_NUM")
+        if line_num is not None and not isinstance(line_num, str):
+            raise TimetableError(f"{index + 1}번째 행의 LINE_NUM이 문자열이 아닙니다: {type(line_num).__name__}")
+        express = row.get("EXPRESS_YN")
+        if express not in EXPRESS_VALUES:
+            raise TimetableError(f"{index + 1}번째 행의 EXPRESS_YN 값이 G 또는 D가 아닙니다: {express!r}")
         parsed.append(
             StopRow(
                 train_no=train_no,
                 arrival_time=arrival,
                 departure_time=departure,
-                origin_station_code=(row.get("ORIGINSTATION") or None),
-                destination_station_code=(row.get("DESTSTATION") or None),
-                is_express=row.get("EXPRESS_YN") == EXPRESS_FLAG,
-                line_id=line_num_to_line_id(row.get("LINE_NUM", "")),
+                origin_station_code=_optional_code(row, "ORIGINSTATION", index),
+                destination_station_code=_optional_code(row, "DESTSTATION", index),
+                is_express=express == EXPRESS_FLAG,
+                line_id=line_num_to_line_id(line_num or ""),
             )
         )
     return parsed
@@ -153,12 +203,36 @@ def station_codes_in_db(session: Session) -> list[str]:
     )
 
 
+def _stored_fetched_at(session: Session, station_line_id: int, day_type: str, direction: int) -> str | None:
+    """그룹에 저장된 가장 최신 fetched_at. 비어 있으면 None."""
+    values = session.scalars(
+        select(TrainSchedule.fetched_at).distinct().where(
+            TrainSchedule.station_line_id == station_line_id,
+            TrainSchedule.service_day_type == day_type,
+            TrainSchedule.direction == direction,
+        )
+    ).all()
+    if not values:
+        return None
+    try:
+        return max(to_utc_iso(parse_utc_iso(v)) for v in values)
+    except ValueError:
+        raise TimetableError(
+            f"저장된 fetched_at 형식이 올바르지 않아 교체 여부를 판단할 수 없습니다: 역-노선 {station_line_id} {day_type} {direction}"
+        ) from None
+
+
 def load_timetables(
     session: Session, collected: Collected, *, fetched_at: str, dry_run: bool = False
 ) -> TimetableReport:
-    """수집 결과를 적재한다. 실패하면 롤백하고 예외를 던진다. dry_run이면 적용해 본 뒤 롤백한다."""
+    """수집 결과를 적재한다. 실패하면 롤백하고 예외를 던진다. dry_run이면 적용해 본 뒤 롤백한다.
+
+    쓰기 전에 모든 그룹의 노선을 검사한다. 노선 미확인·불일치 행이 있거나 저장된 데이터보다 오래된 수집이면
+    TimetableError로 전체를 거부하고 기존 행과 fetched_at을 그대로 둔다.
+    """
     report = TimetableReport(dry_run=dry_run)
     try:
+        fetched_at = normalize_fetched_at(fetched_at)
         resolved = {
             code: (sl_id, line_id)
             for code, sl_id, line_id in session.execute(
@@ -171,12 +245,33 @@ def load_timetables(
                 .where(StationExternalId.source == SOURCE_OA12035)
             )
         }
-        for (code, day_type, direction), stops in sorted(collected.items()):
+        groups = sorted(collected.items())
+        for (code, day_type, direction), stops in groups:
+            found = resolved.get(code)
+            if found is None:
+                continue
+            for stop in stops:
+                if stop.line_id is None:
+                    raise TimetableError(
+                        f"노선을 확인할 수 없는 행이 있어 적재를 거부했습니다(LINE_NUM 없음·미지원): "
+                        f"{code} {day_type} {direction} {stop.train_no}"
+                    )
+                if stop.line_id != found[1]:
+                    raise TimetableError(
+                        f"연결된 노선({found[1]}호선)과 다른 노선({stop.line_id}호선) 행이 있어 적재를 거부했습니다: "
+                        f"{code} {day_type} {direction} {stop.train_no}"
+                    )
+        for (code, day_type, direction), stops in groups:
             found = resolved.get(code)
             if found is None:
                 report.counts["unmapped_station_codes"] += 1
                 continue
-            station_line_id, line_id = found
+            station_line_id, _ = found
+            stored = _stored_fetched_at(session, station_line_id, day_type, direction)
+            if stored is not None and fetched_at < stored:
+                raise TimetableError(
+                    f"저장된 데이터({stored})보다 오래된 수집({fetched_at})으로는 교체하지 않습니다: {code} {day_type} {direction}"
+                )
             session.execute(
                 delete(TrainSchedule).where(
                     TrainSchedule.station_line_id == station_line_id,
@@ -184,13 +279,7 @@ def load_timetables(
                     TrainSchedule.direction == direction,
                 )
             )
-            kept: list[StopRow] = []
-            for stop in stops:
-                if stop.line_id is not None and stop.line_id != line_id:
-                    report.counts["line_mismatch_skipped"] += 1
-                    continue
-                kept.append(stop)
-            merged, merged_count = merge_loop_terminal_rows(kept)
+            merged, merged_count = merge_loop_terminal_rows(stops)
             report.counts["loop_terminal_merged"] += merged_count
             seen: set[str] = set()
             for stop in merged:
