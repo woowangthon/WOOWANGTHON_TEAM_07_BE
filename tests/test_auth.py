@@ -124,6 +124,33 @@ def test_unconfigured_or_unknown_provider(client, monkeypatch):
     assert client.get("/api/auth/me").status_code == 401
 
 
+def test_provider_readiness_has_only_flags_not_credentials(client, oauth):
+    response = client.get('/api/auth/providers')
+    assert response.status_code == 200
+    assert response.json() == {'providers': {'google': {'configured': True}, 'kakao': {'configured': True}},
+                               'storage_ready': True, 'limitations': []}
+    assert 'test-secret' not in response.text and 'test-google' not in response.text
+    assert response.headers['cache-control'] == 'no-store'
+
+
+def test_unmigrated_database_returns_actionable_error_without_writes(tmp_path, oauth):
+    from app.database import get_session, make_engine
+    from app.main import create_app
+    from sqlalchemy.orm import Session
+    from sqlalchemy import inspect
+    engine = make_engine(f'sqlite:///{tmp_path / "unmigrated.db"}')
+    app = create_app()
+    with Session(engine) as db:
+        app.dependency_overrides[get_session] = lambda: db
+        browser = TestClient(app)
+        assert browser.get('/api/auth/providers').json()['storage_ready'] is False
+        response = browser.get('/api/auth/google/login', follow_redirects=False)
+        assert response.status_code == 503
+        assert response.json()['error']['code'] == 'AUTH_STORAGE_NOT_READY'
+        assert inspect(engine).get_table_names() == []
+    engine.dispose()
+
+
 def test_profile_favorites_persist_after_logout_and_relogin(client, db, oauth):
     me = sign_in(client)
     headers = mutation_headers(me)

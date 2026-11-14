@@ -15,7 +15,8 @@ Google·카카오 OAuth와 서버 저장 즐겨찾기를 추가했다. 기존 �
 
 | 메서드·경로 | 요청/응답 |
 |---|---|
-| `GET /api/auth/{google\|kakao}/login` | OAuth 화면으로 302. 키 미설정 503 `AUTH_NOT_CONFIGURED`, 미지원 제공자 404 |
+| `GET /api/auth/providers` | `{ providers: { google: { configured: bool }, kakao: { configured: bool } }, storage_ready: bool, limitations: [] }`. 키·Secret·세션 값을 공개하지 않음 |
+| `GET /api/auth/{google\|kakao}/login` | OAuth 화면으로 302. 키 미설정 503 `AUTH_NOT_CONFIGURED`, 계정 테이블 미적용 503 `AUTH_STORAGE_NOT_READY`, 미지원 제공자 404. Google은 계정 선택 화면 사용 |
 | `GET /api/auth/{google\|kakao}/callback` | 일회용 state와 브라우저 쿠키 검증, Google PKCE. 성공 시 세션 쿠키와 설정된 FE 주소로 303 |
 | `GET /api/auth/me` | `{ id, name, provider, csrf_token, limitations: [] }`, 미로그인/만료 401 |
 | `PATCH /api/auth/profile` | `{ display_name: string(1..30) }` → 최신 me 응답 |

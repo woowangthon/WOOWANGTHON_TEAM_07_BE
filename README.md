@@ -30,9 +30,11 @@
    npm.cmd run dev:auth
    ```
 
-`http://127.0.0.1:5173/#/main`에서 로그인 탭을 연다. `dev:auth`는 실제 인증을 사용하며 일반 `dev`의 데모 설정을 바꾸지 않는다. 로그인한 뒤 이름·즐겨찾기 역/장소를 저장하면 서버 DB에서 새로고침·재로그인 때 복원한다. 로그아웃은 세션만 폐기하고 즐겨찾기는 남긴다. 역 추천은 저장한 역과 확인된 역 ID만 사용한다. 역 목록이 없는 새 DB에서는 역 시드 적재가 별도로 필요하다.
+`http://127.0.0.1:5173/#/main`에서 로그인 탭을 연다. 일반 `npm.cmd run dev`와 `dev:auth` 모두 실제 인증을 사용한다. 데모 인증은 `dev:mock`으로 명시해서 실행한다. 제공자 키가 설정되어 있으면 `AUTH_FRONTEND_URL`에 지정된 정확한 Origin은 쿠키 요청에 자동 허용하며, 추가 Origin은 `CORS_ALLOWED_ORIGINS`로 지정한다. 로그인한 뒤 이름·즐겨찾기 역/장소를 저장하면 서버 DB에서 새로고침·재로그인 때 복원한다. 로그아웃은 세션만 폐기하고 즐겨찾기는 남긴다. 역 추천은 저장한 역과 확인된 역 ID만 사용한다. 역 목록이 없는 새 DB에서는 역 시드 적재가 별도로 필요하다.
 
-인증 키가 필요한 실제 제공자 로그인은 키 발급 후 확인해야 한다. 테스트는 제공자의 토큰·사용자 정보 HTTP 응답을 대체해 OAuth 흐름과 DB 저장을 검증하며 실제 Google·카카오에 접속하지 않는다.
+`GET /api/auth/providers`는 키 값을 공개하지 않고 제공자별 `configured`와 `storage_ready`만 반환한다. 키를 입력했는데 저장소가 준비되지 않았다면 DB 마이그레이션이 필요하다. 미적용 DB에서 로그인하면 500 대신 503 `AUTH_STORAGE_NOT_READY`를 반환하며 DB를 자동 변경하지 않는다. `.env` 키를 추가/변경한 뒤에는 BE 서버를 재시작한다.
+
+자동 테스트는 제공자의 토큰·사용자 정보 HTTP 응답을 대체해 OAuth 흐름과 DB 저장을 검증하며 실제 Google·카카오에 접속하지 않는다. 별도의 `FE/web/scripts/verify-google-live.mjs`로 실제 Google 키·콜백 등록 후 Google 계정 입력 화면 진입도 확인했다. 사용자 비밀번호·동의 입력은 자동화하지 않으며, 실제 계정 인증 완료와 카카오 실계정 로그인은 별도 확인한다.
 
 배포 시 `AUTH_PUBLIC_BASE_URL=https://백엔드주소`, `AUTH_FRONTEND_URL=https://프론트주소/#/main`, `AUTH_COOKIE_SECURE=true`, `CORS_ALLOWED_ORIGINS=https://프론트주소`로 설정하고 콘솔의 콜백 URI도 같은 값으로 바꾼다. FE의 `VITE_API_BASE`·`VITE_BE_BASE`에는 공개 BE 주소만 넣고 `npm.cmd run build:auth`로 빌드한다. 쿠키는 SameSite=Lax이므로 FE/BE는 같은 사이트의 HTTPS 도메인 또는 같은 Origin의 프록시로 배치한다. 서로 다른 사이트를 연결하는 쿠키 구성은 지원하지 않는다. 로컬에서도 `localhost`와 `127.0.0.1`을 섞지 않는다.
 

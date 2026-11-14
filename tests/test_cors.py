@@ -61,3 +61,15 @@ def test_invalid_origins_fail_at_startup(monkeypatch, bad):
 def test_parse_origins_normalizes_and_dedupes():
     assert parse_origins(" http://a.com/ ,http://a.com,, https://b.com:8443 ") == ["http://a.com", "https://b.com:8443"]
     assert parse_origins("") == []
+
+
+def test_configured_oauth_adds_only_configured_frontend_origin(monkeypatch):
+    from pydantic import SecretStr
+    monkeypatch.setattr(config.settings, 'google_client_id', 'test-client')
+    monkeypatch.setattr(config.settings, 'google_client_secret', SecretStr('test-secret'))
+    monkeypatch.setattr(config.settings, 'auth_frontend_url', 'http://127.0.0.1:5173/#/main')
+    client = make_client(monkeypatch, '')
+    response = client.get('/health', headers={'Origin': 'http://127.0.0.1:5173'})
+    assert response.headers['access-control-allow-origin'] == 'http://127.0.0.1:5173'
+    assert response.headers['access-control-allow-credentials'] == 'true'
+    assert 'access-control-allow-origin' not in client.get('/health', headers={'Origin': 'https://evil.example'}).headers
