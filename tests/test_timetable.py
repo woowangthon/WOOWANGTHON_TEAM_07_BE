@@ -211,13 +211,15 @@ def test_unmapped_station_code_is_counted_and_skipped(mapped):
     assert mapped.scalar(select(func.count()).select_from(TrainSchedule)) == 3
 
 
-def test_line_mismatch_rows_are_skipped_and_counted(mapped):
+def test_line_mismatch_rows_reject_the_whole_load(mapped):
+    """#71: 불일치 행을 건너뛰면 그룹이 부분 스냅샷이 되므로 전체를 거부한다. 자세한 검증은 test_timetable_integrity.py."""
     data = schedule()
     data["0222"] = [row("0222", "1", "00:00:00", "06:00:00", line="03호선")]
 
-    report = load_timetables(mapped, fetch_timetables(FakeClient(data), ["0222"]), fetched_at="2026-11-14T03:00:00Z")
+    with pytest.raises(TimetableError, match="노선"):
+        load_timetables(mapped, fetch_timetables(FakeClient(data), ["0222"]), fetched_at="2026-11-14T03:00:00Z")
 
-    assert report.counts["line_mismatch_skipped"] == 1 and report.counts["rows_written"] == 0
+    assert mapped.scalar(select(func.count()).select_from(TrainSchedule)) == 0
 
 
 def test_reingest_replaces_a_group_instead_of_adding(mapped):
