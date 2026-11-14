@@ -20,3 +20,4 @@ DEP_NO_TIMETABLE = "실제 열차 시간표를 사용하지 않은 추정 계산
 DEP_TRAVEL_EXTERNAL = "예상 이동 시간은 외부에서 입력한 값이며 경로 탐색으로 검증되지 않음"
 DEP_SEGMENT_ESTIMATES = "도보·역 진입·출구 이동 시간은 추정값이며 개인과 상황에 따라 다를 수 있음"
 DEP_ALREADY_PAST = "추천 출발 시각이 현재 시각보다 이미 지났음"
+DEP_ELEVATOR_UNCONFIRMED = "역·설비 상태 정보가 입력되지 않아 엘리베이터 경고를 확인하지 못함"
