@@ -31,6 +31,12 @@ uv run pytest
 
 테스트는 임시 SQLite 파일에 마이그레이션을 적용해서 실행하므로 `data/dev.db`를 건드리지 않는다.
 
+## 엘리베이터 상태 TTL
+
+- 환경 변수 `ELEVATOR_STATUS_TTL_MINUTES`(정수, 1~1440분)로 설정한다.
+- 기본값은 **120분(2시간)** 이다. 갱신 주기를 검증하지 못해 정한 **임시 기본값**이며, 확인되면 바꾼다.
+- 저장된 `fetched_at`이 TTL보다 오래되면 응답의 `status`는 `null`, `unknown_reason`은 `STALE`이다.
+
 ## 오류 응답 형식
 
 모든 오류 응답은 아래 형식을 따른다.

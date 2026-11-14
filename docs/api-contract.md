@@ -393,7 +393,7 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 
 - 판정 기준은 `fetched_at`이다. OA-15994 응답에는 원본 측정 시각(`observed_at`)이 없어서 `observed_at`은 기준으로 쓰지 않는다.
 - `data_fresh = (현재 시각 − fetched_at) ≤ TTL`
-- **TTL 기본값은 30분이며 임시 기본값이다(D1).** 설정값으로 바꿀 수 있다. 설정 키 이름은 `ELEVATOR_STATUS_TTL_MINUTES`를 제안한다(구현 시 확정, 현재 미구현).
+- **TTL 기본값은 120분(2시간)이며 갱신 주기 미검증에 따른 임시 기본값이다(D1).** 설정 키 `ELEVATOR_STATUS_TTL_MINUTES`로 바꿀 수 있고, 허용 범위는 1~1440분이다.
   - `docs/api-notes.md`의 2시간은 매시 갱신 기준의 추정(미검증)이며 참고값이다.
   - 갱신 주기를 확인한 뒤 TTL을 확정한다(미검증).
 
@@ -482,6 +482,15 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 | `POST /api/departure-time` | #39 | `estimated`, `limitations` 포함. 계산 결과를 DB에 저장하지 않음 |
 | 실시간 도착 정보 | #40, #41 | 외부 실패 시 "미확인" 표시. 이전 캐시를 현재 정보처럼 보여 주지 않음 |
 
+### 8.1 대체역 `GET /api/stations/{station_id}/alternatives` (#33, 초안 — FE/AI 리뷰 전)
+
+- 응답: `station`, `station_status`(4.4절과 같음), `alternatives[]`, `count`, `search_depth`, `empty_reason`(없으면 `null`), `limitations`.
+- `alternatives[]`: `station_id`, `station_name`, `lines`, `distance`(간선 수), `same_line`(대상 역과 노선을 하나라도 공유), `station_status`.
+- 후보는 `station_edges`의 ADJACENT 간선을 BFS로 탐색한다(깊이는 `ALTERNATIVE_SEARCH_DEPTH`, 기본 2·임시). 간선이 없으면 후보도 없으며 인접·환승 관계를 추정하지 않는다.
+- 가동중 설비가 확인된 역(`AVAILABLE`, `PARTIAL`)만 후보다. 대상 역이 `AVAILABLE`이고 `data_fresh`면 후보 없이 `empty_reason`을 준다.
+- 정렬: 같은 노선 먼저, 거리, `AVAILABLE` 먼저, 신선한 데이터 먼저, `station_id`.
+- `limitations`에는 항상 "실제 접근 가능한 경로와 환승 가능 여부는 검증되지 않음"이 있다. 오류 형식은 0.6절과 같다.
+
 ---
 
 ## 9. 실제 데이터에서 확인되지 않은 항목 (미검증)
@@ -495,7 +504,7 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 | 설비 노선 소속 | OA-15994에 노선 컬럼이 없다. 응답에 노선 필드를 넣지 않는다 |
 | `observed_at` | OA-15994 응답에 원본 측정 시각이 없다. 현재 항상 `null`이다 |
 | 갱신 주기 | "매시"는 공공데이터 설명 기준이며 응답으로 확인하지 못했다 |
-| TTL | 기본 30분(임시, 설정 가능). 갱신 주기 미검증 (D1) |
+| TTL | 기본 120분(임시, 설정 가능, 1~1440분). 갱신 주기 미검증 (D1) |
 | 엘리베이터 종류 | 응답의 `ELVTR_SE` 중 `EV`만 저장한다. `ES`(에스컬레이터), `WL`(휠체어리프트), `MW`(무빙워크)는 제외한다 |
 | 호출 한도 | 미측정 |
 
@@ -507,7 +516,7 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 
 | # | 항목 | 확정 내용 | 반영 위치 |
 |---|---|---|---|
-| D1 | TTL | 기본 30분(임시값), 설정으로 변경 가능. 갱신 주기 확인 후 확정 | 6.1절, 9절 |
+| D1 | TTL | 기본 120분(임시값, 2026-11-14 30분에서 변경), 설정으로 변경 가능. 갱신 주기 확인 후 확정 | 6.1절, 9절 |
 | D2 | 일부 설비만 미확인인 역 | 판정 가능한 `status`를 유지하고 `data_fresh: false`, `unknown_elevator_count`, 표준 문구 1을 표시 | 6.2절 |
 | D3 | 확인된 설비가 없는 역 | `status: null` (설비가 0개인 역 포함) | 6.2절 |
 | D4 | 검색어 `q` | 앞뒤 공백 제거 후 1~20자. 범위 밖이면 422 | 2.1절 |

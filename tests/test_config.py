@@ -24,10 +24,10 @@ def test_env_example_allows_blank_seoul_key() -> None:
 # ---------- 엘리베이터 상태 TTL 설정 (ELEVATOR_STATUS_TTL_MINUTES) ----------
 
 
-def test_ttl_default_is_thirty_minutes(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_ttl_default_is_120_minutes(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("ELEVATOR_STATUS_TTL_MINUTES", raising=False)
 
-    assert Settings(_env_file=None).elevator_status_ttl_minutes == 30
+    assert Settings(_env_file=None).elevator_status_ttl_minutes == 120
 
 
 def test_ttl_can_be_overridden_by_environment(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -57,4 +57,18 @@ def test_ttl_bounds_match_the_judgment_module() -> None:
     from app.ttl_limits import TTL_MINUTES_DEFAULT, TTL_MINUTES_MAX, TTL_MINUTES_MIN
 
     assert (judge_min, judge_max) == (TTL_MINUTES_MIN, TTL_MINUTES_MAX) == (1, 1440)
-    assert TTL_MINUTES_DEFAULT == 30
+    assert TTL_MINUTES_DEFAULT == 120
+
+
+def test_alternative_search_depth_default_and_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ALTERNATIVE_SEARCH_DEPTH", raising=False)
+    assert Settings(_env_file=None).alternative_search_depth == 2
+    monkeypatch.setenv("ALTERNATIVE_SEARCH_DEPTH", "4")
+    assert Settings(_env_file=None).alternative_search_depth == 4
+
+
+@pytest.mark.parametrize("value", ["0", "11", "abc"])
+def test_alternative_search_depth_rejects_out_of_range(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+    monkeypatch.setenv("ALTERNATIVE_SEARCH_DEPTH", value)
+    with pytest.raises(Exception):
+        Settings(_env_file=None)

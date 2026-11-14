@@ -46,7 +46,7 @@ def _add(db, elevator_id, station_id, status=None, age=timedelta(0)):
         db.flush()
 
 
-STALE_AGE = timedelta(hours=2)  # 기본 TTL 30분을 넘긴 값
+STALE_AGE = timedelta(hours=3)  # 기본 TTL 120분을 넘긴 값
 
 
 @pytest.fixture
@@ -186,7 +186,7 @@ def test_no_data_elevator_has_null_fetched_at(client, seeded):
 
 
 def test_ttl_comes_from_settings(client, seeded, monkeypatch):
-    # 역 6의 설비는 5분 전에 가져왔다. 기본 TTL 30분 안이므로 신선하다.
+    # 역 6의 설비는 5분 전에 가져왔다. 기본 TTL 120분 안이므로 신선하다.
     fresh = client.get("/api/stations/6/elevators").json()
     assert fresh["elevators"][0]["data_fresh"] is True
     assert fresh["station_status"]["status"] == "AVAILABLE"
