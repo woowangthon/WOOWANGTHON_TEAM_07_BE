@@ -85,7 +85,7 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 | 4 | GET | `/api/elevators/status` | 5절 | #28 | 계약 초안 |
 | 5 | GET | `/api/stations/{station_id}/alternatives` | 8절 (예약) | #33 | 후속 확정 |
 | 6 | GET | `/api/routes` | 8절 (예약) | #37 | 후속 확정 |
-| 7 | POST | `/api/departure-time` | 8절 (예약) | #39 | 후속 확정 |
+| 7 | POST | `/api/departure-time` | 8.2절 | #39 | 계약 초안(구현됨, 시간표 미사용) |
 
 ---
 
@@ -491,17 +491,72 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 - 정렬: 같은 노선 먼저, 거리, `AVAILABLE` 먼저, 신선한 데이터 먼저, `station_id`.
 - `limitations`에는 항상 "실제 접근 가능한 경로와 환승 가능 여부는 검증되지 않음"이 있다. 오류 형식은 0.6절과 같다.
 
-### 8.2 출발 권장 시각 계산 (#38, #39, 초안 — 계산 로직만 구현, API 엔드포인트는 아직 없음)
+### 8.2 출발 권장 시각 `POST /api/departure-time` (#39, 필드·기본값 확정 — FE/AI 리뷰 전)
 
-- 계산: `권장 출발 = 도착 희망 − (집→역 도보 + 역 진입 + 여유 시간 + 예상 이동 시간 + 출구 이동)`. `app/services/departure_time.py`의 순수 함수이며 DB·네트워크·시스템 시계를 쓰지 않고 결과를 저장하지 않는다.
-- 입력: 도착 희망 시각(오프셋 있는 ISO 8601, 초 단위, 타임존 없으면 거부), 예상 이동 시간 1~720분(**외부 입력**, 경로 탐색을 하지 않음), 여유 시간 0~240분, 도보·역 진입·출구 이동 각 0~120분. 기본값은 7·3·3분이며 **검증되지 않은 추정값**이다. `WALK_TO_STATION_MINUTES`, `STATION_ENTRY_MINUTES`, `EXIT_WALK_MINUTES`로 바꾼다.
-- 응답 후보 필드: `recommended_departure_at`, `arrival_at`(KST, 0.2절), `total_minutes`, `date_changed`(KST 기준 출발일과 도착일이 다름), `already_past`(현재 시각을 줄 때만 boolean, 아니면 `null`), `estimated`, `timetable_used`, `inputs`, `timeline[]`(`kind`, `label`, `start_at`, `end_at`, `minutes`), `limitations`.
-- **실제 열차 시간표를 쓰지 않으므로 항상 `estimated: true`, `timetable_used: false`** 이고 `limitations`에 아래 문구가 항상 들어간다. 탑승 가능한 열차는 고르지 않는다.
-  - 실제 열차 시간표를 사용하지 않은 추정 계산이며 탑승 가능한 열차는 확인되지 않음
-  - 예상 이동 시간은 외부에서 입력한 값이며 경로 탐색으로 검증되지 않음
-  - 도보·역 진입·출구 이동 시간은 추정값이며 개인과 상황에 따라 다를 수 있음
-  - (이미 지난 경우) 추천 출발 시각이 현재 시각보다 이미 지났음
-- 미구현: 엘리베이터 경고 연동, 시간표 기반 탑승 열차 선택(#35 이후), POST 엔드포인트와 입력 검증 응답(오류는 0.6절 형식).
+도착 희망 시각에서 거꾸로 계산해 권장 출발 시각을 준다. 계산은 `app/services/departure_time.py`의 순수 함수를 그대로 쓴다. **경로 탐색, 실제 열차 시간표, 실시간 도착 정보, AI 추천을 쓰지 않는다.** DB를 읽지도 저장하지도 않는다.
+
+`권장 출발 = 도착 희망 − (집→역 도보 + 역 진입 + 여유 시간 + 예상 이동 시간 + 출구 이동)`
+
+**요청 (JSON 본문).** 알 수 없는 필드는 422다. 분 값은 정수만 받는다(문자열·실수·bool은 422).
+
+| 필드 | 필수 | 타입 | 규칙 | 기본값 |
+|---|---|---|---|---|
+| `arrival_at` | 필수 | string | 오프셋이 있는 ISO 8601, 초 단위(`2026-11-13T09:00:00+09:00`, `...Z`). 오프셋 없음·날짜만·소수 초는 422 | - |
+| `travel_minutes` | 필수 | integer | 1~720. **외부에서 받은 예상 이동 시간**(경로 탐색으로 검증하지 않음) | - |
+| `buffer_minutes` | 선택 | integer | 0~240. 필요한 여유 시간(탑승 전에 둠) | **0** |
+| `walk_to_station_minutes` | 선택 | integer | 0~120. 집→역 도보 | 설정 `WALK_TO_STATION_MINUTES` (**7**) |
+| `station_entry_minutes` | 선택 | integer | 0~120. 역 진입 | 설정 `STATION_ENTRY_MINUTES` (**3**) |
+| `exit_walk_minutes` | 선택 | integer | 0~120. 하차 후 출구 이동 | 설정 `EXIT_WALK_MINUTES` (**3**) |
+
+- 선택 필드를 생략하거나 `null`로 주면 기본값을 쓰고, 쓴 필드 이름을 `defaults_applied`에 담는다. 7·3·3분은 **검증되지 않은 추정값**이다.
+- "이미 지났는지"는 서버의 현재 시각으로 판단한다. 현재 시각을 요청으로 받지 않는다.
+
+**응답 (200).** 시각은 모두 KST(+09:00)다(0.2절).
+
+```json
+{
+  "recommended_departure_at": "2026-11-13T23:17:00+09:00",
+  "estimated_boarding_at": "2026-11-13T23:37:00+09:00",
+  "estimated_alighting_at": "2026-11-14T00:07:00+09:00",
+  "arrival_at": "2026-11-14T00:10:00+09:00",
+  "total_minutes": 53,
+  "date_changed": true,
+  "already_past": false,
+  "estimated": true,
+  "timetable_used": false,
+  "inputs": {"travel_minutes": 30, "buffer_minutes": 10, "walk_to_station_minutes": 7, "station_entry_minutes": 3, "exit_walk_minutes": 3},
+  "defaults_applied": ["walk_to_station_minutes", "station_entry_minutes", "exit_walk_minutes"],
+  "timeline": [
+    {"kind": "WALK_TO_STATION", "label": "집에서 역까지 도보", "start_at": "2026-11-13T23:17:00+09:00", "end_at": "2026-11-13T23:24:00+09:00", "minutes": 7},
+    {"kind": "STATION_ENTRY", "label": "역 진입", "start_at": "2026-11-13T23:24:00+09:00", "end_at": "2026-11-13T23:27:00+09:00", "minutes": 3},
+    {"kind": "BUFFER", "label": "여유 시간", "start_at": "2026-11-13T23:27:00+09:00", "end_at": "2026-11-13T23:37:00+09:00", "minutes": 10},
+    {"kind": "RIDE", "label": "열차 이동(외부 입력 예상 시간)", "start_at": "2026-11-13T23:37:00+09:00", "end_at": "2026-11-14T00:07:00+09:00", "minutes": 30},
+    {"kind": "EXIT_WALK", "label": "출구 이동", "start_at": "2026-11-14T00:07:00+09:00", "end_at": "2026-11-14T00:10:00+09:00", "minutes": 3}
+  ],
+  "elevator_warning": {"status": "UNCONFIRMED", "items": [], "message": "역·설비 상태 정보가 입력되지 않아 엘리베이터 경고를 확인하지 못함"},
+  "limitations": [
+    "실제 열차 시간표를 사용하지 않은 추정 계산이며 탑승 가능한 열차는 확인되지 않음",
+    "예상 이동 시간은 외부에서 입력한 값이며 경로 탐색으로 검증되지 않음",
+    "도보·역 진입·출구 이동 시간은 추정값이며 개인과 상황에 따라 다를 수 있음",
+    "역·설비 상태 정보가 입력되지 않아 엘리베이터 경고를 확인하지 못함"
+  ]
+}
+```
+
+| 필드 | 설명 |
+|---|---|
+| `recommended_departure_at` | 권장 출발 시각 |
+| `estimated_boarding_at`, `estimated_alighting_at` | **추정** 탑승·하차 시각. 시간표를 쓰지 않았으므로 **열차 탑승 확정 시각이 아니다**. 탑승 가능한 열차를 고르지 않는다 |
+| `arrival_at` | 요청한 도착 희망 시각(KST) |
+| `date_changed` | KST 날짜 기준으로 출발일과 도착일이 다르면 `true`(자정 이전 출발) |
+| `already_past` | 권장 출발 시각이 서버 현재 시각보다 이전이면 `true`. 같으면 `false` |
+| `estimated` / `timetable_used` | 항상 `true` / `false` |
+| `elevator_warning` | 역·설비 상태를 입력받거나 조회하지 않으므로 항상 `status: "UNCONFIRMED"`, `items: []`. **경고를 임의로 만들지 않는다.** 역 연동은 후속 범위 |
+| `limitations` | 위 3개 + 엘리베이터 미확인 문구가 항상 들어간다. `already_past`가 `true`면 "추천 출발 시각이 현재 시각보다 이미 지났음"이 추가된다 |
+
+**오류.** 0.6절 형식이다. 잘못된 시각·형식, 정수가 아닌 값, 범위 밖 값, 알 수 없는 필드, 깨진 JSON, 표현 가능한 날짜 범위를 벗어난 시각은 422 `VALIDATION_ERROR`, GET 등 다른 메서드는 405다.
+
+**미구현(보류).** 경로 탐색(#37), 시간표 기반 탑승 열차 선택(#35 이후), 실시간 도착(#40, #41), 엘리베이터 경고의 역·설비 연동, AI 최적 경로 추천.
 
 ---
 
