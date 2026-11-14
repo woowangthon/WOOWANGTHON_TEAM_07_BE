@@ -3,10 +3,14 @@ from typing import Literal
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_session
 from app.errors import CODE_VALIDATION_ERROR, AppError
+from app.schemas.elevators import StationStatusListResponse
 from app.schemas.stations import StationDetail, StationSearchResponse
+from app.services.elevator_queries import list_station_statuses
 from app.services.stations import get_station_detail, search_stations
+from app.timeutil import utc_now
 
 router = APIRouter(prefix="/api/stations", tags=["stations"])
 
@@ -41,6 +45,18 @@ def list_stations(
             f"검색어는 앞뒤 공백을 제외하고 {KEYWORD_MIN}~{KEYWORD_MAX}자여야 합니다.",
         )
     return search_stations(session, keyword, line)
+
+
+# 주의: 고정 경로 `/status`는 `/{station_id}`보다 먼저 등록해야 정수 파싱 422로 가려지지 않는다.
+@router.get("/status", response_model=StationStatusListResponse)
+def read_station_statuses(
+    line: LineId | None = Query(None, description="노선 필터 (1~8). 그 노선을 지나는 역만 남긴다. 그 외 값은 422"),
+    session: Session = Depends(get_session),
+) -> StationStatusListResponse:
+    """역 단위 상태 목록(지도 색칠용). 판정은 역별 엘리베이터 API와 같은 코드다(계약 5.5절, D20)."""
+    return list_station_statuses(
+        session, line=line, now=utc_now(), ttl_minutes=settings.elevator_status_ttl_minutes
+    )
 
 
 @router.get("/{station_id}", response_model=StationDetail)

@@ -81,7 +81,7 @@
 
 ## 1. 엔드포인트 목록
 
-업무 엔드포인트 8개(Issue #8의 7개 + 경로 `GET /api/routes`)와 헬스 체크다.
+업무 엔드포인트 9개(Issue #8의 7개 + 경로 `GET /api/routes` + 역 단위 상태 목록 `GET /api/stations/status`)와 헬스 체크다.
 
 | # | Method | Path | 이 문서 | 구현 Issue | 상태 |
 |---|---|---|---|---|---|
@@ -94,6 +94,7 @@
 | 6 | GET | `/api/routes` | 8.4절 | #36, #37 | 계약 초안(구현됨, 추정 소요 시간) |
 | 7 | POST | `/api/departure-time` | 8.2절 | #39 | 계약 초안(구현됨, 시간표 미사용, 역 id를 주면 경로 경고) |
 | 8 | GET | `/api/stations/{station_id}/arrivals` | 8.3절 | #40, #41 | 계약 초안(구현됨, 외부 출처 미연동) |
+| 9 | GET | `/api/stations/status` | 5.5절 | — | 구현됨(D20). 고정 경로이며 `/api/stations/{station_id}`보다 먼저 등록 |
 
 ---
 
@@ -388,6 +389,88 @@
 | 상황 | 상태 | `error.code` |
 |---|---|---|
 | `status`가 허용 값이 아님 (예: `고장`, `보수중`) | 422 | `VALIDATION_ERROR` |
+
+### 5.5 역 단위 상태 목록 — `GET /api/stations/status` (D20)
+
+지도에서 역마다 색을 칠하기 위한 목록이다. FE가 판정 규칙(6절)을 다시 구현하지 않도록, 역별 API(`GET /api/stations/{station_id}/elevators`)의 `station_status`와 **같은 코드**로 판정한 값을 한 번에 돌려준다.
+
+| 파라미터 | 위치 | 필수 | 타입 | 규칙 |
+|---|---|---|---|---|
+| `line` | query | 선택 | string | `"1"`~`"8"`. 그 노선을 지나는 역만 남긴다. 그 외는 422 `VALIDATION_ERROR` |
+
+- 역마다 정확히 한 건이고 `station_id` 오름차순이다. 엘리베이터가 없는 역도 포함하며 `status: null`, 개수 0이다(6.2절 `T = 0`).
+- `stations[].station_status`는 4.4절의 `station_status`와 같은 필드(`status`, `data_fresh`, `total_elevator_count`, `unknown_elevator_count`)이고 6.2절 규칙을 따른다. 역별 API와 값이 일치하는지 테스트로 확인한다(`tests/test_station_status_list.py`).
+- `lines`는 역이 지나는 **전체** 노선이며 `line` 필터와 무관하다(5.3절과 같다).
+- `limitations`: 시스템 전체 설비 중 미확인(NO_DATA, STALE)이 있으면 `"일부 설비의 상태 정보가 없거나 오래되어 현재 상태를 확인하지 못함"`(필터와 무관, 5.1절과 같은 기준). `line=1`이거나 결과에 1호선 역이 있으면 1호선 문구(D11). 역별 `limitations`(문구 1~3)는 담지 않으므로 FE는 `status`·`data_fresh`로 색과 표시를 정한다. 6.2절의 FE 표시 규칙(`data_fresh: false`를 단정하지 않기, `null`은 "정보 없음")이 그대로 적용된다.
+- 응답 예시는 테스트용 임시 DB(역 10개 규칙 확인용 데이터)에서 `TestClient`로 `GET /api/stations/status?line=2`를 호출해 얻은 실제 출력 중 앞 3개 역만 남긴 것이다(실제 역 데이터·`data/dev.db` 값이 아니다). 실제 운영 데이터로 호출한 결과는 (미검증).
+
+```json
+{
+  "stations": [
+    {
+      "station_id": 2,
+      "station_name": "시청",
+      "lines": [
+        {
+          "line_id": "1",
+          "line_name": "1호선"
+        },
+        {
+          "line_id": "2",
+          "line_name": "2호선"
+        }
+      ],
+      "station_status": {
+        "status": null,
+        "data_fresh": false,
+        "total_elevator_count": 2,
+        "unknown_elevator_count": 2
+      }
+    },
+    {
+      "station_id": 3,
+      "station_name": "강남",
+      "lines": [
+        {
+          "line_id": "2",
+          "line_name": "2호선"
+        }
+      ],
+      "station_status": {
+        "status": "AVAILABLE",
+        "data_fresh": true,
+        "total_elevator_count": 2,
+        "unknown_elevator_count": 0
+      }
+    },
+    {
+      "station_id": 5,
+      "station_name": "교대(법원, 검찰청)",
+      "lines": [
+        {
+          "line_id": "2",
+          "line_name": "2호선"
+        },
+        {
+          "line_id": "3",
+          "line_name": "3호선"
+        }
+      ],
+      "station_status": {
+        "status": "UNAVAILABLE",
+        "data_fresh": true,
+        "total_elevator_count": 1,
+        "unknown_elevator_count": 0
+      }
+    }
+  ],
+  "count": 6,
+  "limitations": [
+    "일부 설비의 상태 정보가 없거나 오래되어 현재 상태를 확인하지 못함",
+    "1호선은 일부 구간의 역만 포함되어 있어 전체 구간을 포함하지 않음"
+  ]
+}
+```
 
 ---
 
@@ -729,6 +812,7 @@
 | D17 | 출발 시각 API의 이동 시간 | `travel_minutes`는 외부 입력을 유지한다. 역 id를 주면 경로 위 모든 역의 엘리베이터 경고를 계산한다(2026-11-14) | 8.2절 |
 | D18 | 상태 목록의 노선 | `line` 필터와 `lines` 필드를 추가한다. 역이 지나는 노선이며 설비의 노선이 아니다(2026-11-14, AI 요청) | 5절 |
 | D19 | 역 전체 목록 | `GET /api/stations`에서 `q`를 생략하면 전체 역(`line` 필터 적용). 명시한 빈 `q`는 422 유지(2026-11-15, 사용자 결정, #73) | 2.1절 |
+| D20 | 역 단위 상태 목록 | 지도 색칠용 `GET /api/stations/status`. 판정은 역별 API와 같은 코드(`_judge`)를 쓴다. 설비 없는 역 포함, `line` 필터 지원(2026-11-15) | 5.5절 |
 
 ### 10.2 FE/AI 검토가 필요한 항목
 

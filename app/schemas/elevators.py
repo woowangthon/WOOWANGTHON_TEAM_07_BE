@@ -76,3 +76,20 @@ class ElevatorStatusListResponse(BaseModel):
     elevators: list[ElevatorStatusItem]
     count: int
     limitations: list[str]
+
+
+class StationStatusItem(BaseModel):
+    """역 단위 상태 목록의 역 한 곳. docs/api-contract.md 5.5절."""
+
+    station_id: int
+    station_name: str
+    lines: list[LineRef]  # 역이 지나는 전체 노선. line 필터와 무관하다
+    station_status: StationStatusSummary
+
+
+class StationStatusListResponse(BaseModel):
+    """GET /api/stations/status 응답. docs/api-contract.md 5.5절."""
+
+    stations: list[StationStatusItem]
+    count: int
+    limitations: list[str]
