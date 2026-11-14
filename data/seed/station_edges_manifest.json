@@ -15,10 +15,15 @@
       "x/y coordinates"
     ]
   },
-  "adjacent_source": "OA-12035+FE-MOCK",
+  "grades": {
+    "VERIFIED": "공식 출처가 관계를 직접 증명(OA-13290 환승 기록). TRANSFER만 해당",
+    "PROVISIONAL": "프론트 순서와 공식 역번호 연속성이 일치하는 ADJACENT. 공식 인접 증명 아님. 기본 로더 적재 제외",
+    "PENDING": "그 밖의 후보. 적재 안 함"
+  },
+  "adjacent_source_provisional": "OA-12035+FE-MOCK",
   "transfer_source": "OA-13290",
   "direction_policy": "한 쌍당 한 행(from은 역번호가 작은 쪽). 소비하는 쪽은 무방향으로 취급",
-  "adjacent_evidence_limit": "공식 인접역 데이터셋 대조가 아니라 역번호 연속성에 의한 교차 검증",
+  "adjacent_evidence_limit": "공식 인접역 자료 없음. 역번호 연속성은 인접 관계의 공식 증명이 아니다",
   "stats": {
     "mapping_success": 257,
     "mapping_failed": 24,
@@ -26,7 +31,8 @@
       "NOT_IN_BACKEND_SEED": 24
     },
     "name_variants_accepted": 67,
-    "adjacent_verified": 239,
+    "adjacent_verified": 0,
+    "adjacent_provisional": 239,
     "adjacent_pending": 36,
     "transfer_verified": 38,
     "confirmed_transfer_groups": 34

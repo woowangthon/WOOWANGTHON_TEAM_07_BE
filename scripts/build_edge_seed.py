@@ -1,4 +1,10 @@
-"""검증된 역 간선 시드(station_edges)를 만든다. DB에 쓰지 않는다.
+"""역 간선 시드(station_edges)를 등급별로 만든다. DB에 쓰지 않는다.
+
+검증 등급
+- VERIFIED    공식 출처가 관계를 직접 증명한 간선. 현재는 OA-13290 환승 기록으로 확인한 TRANSFER뿐이다.
+- PROVISIONAL 프론트 순서와 공식 역번호 연속성이 일치하는 ADJACENT. 공식 인접역 자료로 증명되지 않았다.
+              기본 로더는 적재하지 않는다.
+- PENDING     그 밖의 모든 후보(매핑 실패, 역번호 불연속, 순환 연결 등). 적재하지 않는다.
 
 입력
 - 프론트 목업 JS (--mock-js): window.MOCK의 lines[].segments, lines[].loop, stations(이름·노선)만 읽는다.
@@ -7,12 +13,13 @@
 - data/seed (--seed-dir): stations_oa12035.csv, station_review.csv, transfer_evidence_oa13290.csv
 
 출력 (--out-dir, 기본 data/seed)
-- station_edges_verified.csv   적재 가능한 간선(VERIFIED)만. 로더는 이 파일만 읽는다.
-- station_edges_review.csv     PENDING, 매핑 실패, 역명 변형 등 사람이 검토할 목록. 적재하지 않는다.
+- station_edges_verified.csv     VERIFIED(TRANSFER)만. 기본 로더가 읽는 유일한 파일이다.
+- station_edges_provisional.csv  PROVISIONAL(ADJACENT). 기본 로더는 읽지 않고, 로더는 공식 근거 없는 ADJACENT를 거부한다.
+- station_edges_review.csv       PENDING, 매핑 실패, 역명 변형 등 사람이 검토할 목록. 적재하지 않는다.
 - station_edges_manifest.json  입력 해시, 건수, 정책
 
 검증 규칙
-[ADJACENT] 아래를 모두 만족해야 VERIFIED다. 하나라도 어긋나면 PENDING으로 두고 적재하지 않는다.
+[ADJACENT] 아래를 모두 만족하면 PROVISIONAL이다(VERIFIED가 아니다). 하나라도 어긋나면 PENDING이다.
   1. 프론트 segments에서 연속한 두 역이다(본선과 지선은 구분해 기록한다).
   2. 두 역이 같은 노선의 백엔드 역(OA-12035 코드) 하나로 유일하게 매핑된다.
      역명만으로 노선을 넘어 병합하지 않는다. 매핑 근거는 (a) 같은 노선 안 이름 일치,
@@ -20,8 +27,8 @@
      프론트가 그 역의 노선에 해당 노선을 적지 않았거나, 한 백엔드 역에 프론트 역이 둘 이상
      매핑되면 실패다.
   3. 두 역의 공식 역번호(OA-12035)가 같은 노선에서 1 차이로 연속한다.
-     이것이 프론트 순서와 독립된 공식 근거다. 한계: 공식 인접역 데이터셋(역간거리 등)과 대조한 것이
-     아니라 역번호 연속성에 의한 교차 검증이다.
+     프론트 순서와 독립된 교차 검증이지만, 역번호가 인접역 관계를 공식적으로 정의한다는 근거는 없다.
+     공식 인접역 자료(역간거리 등)로 증명하기 전까지 PROVISIONAL이다.
   4. 순환선(loop=true)의 마지막-첫 역 연결은 공식 근거가 없어 PENDING이다.
 [TRANSFER] 이미 확정된 OA-13290 환승 그룹(station_review.csv CONFIRMED)의 모든 쌍만 VERIFIED다.
   양방향 공식 기록이 있어야 한다. 프론트의 환승 표기는 근거로 쓰지 않는다.
@@ -41,7 +48,7 @@ import re
 import sys
 from pathlib import Path
 
-SOURCE_ADJACENT = "OA-12035+FE-MOCK"
+SOURCE_ADJACENT = "OA-12035+FE-MOCK"  # PROVISIONAL 전용. 공식 인접 증명이 아니다
 SOURCE_TRANSFER = "OA-13290"
 LINES = tuple("12345678")
 VERIFIED_HEADER = ["edge_type", "from_code", "from_line", "to_code", "to_line", "source", "evidence"]
@@ -238,10 +245,11 @@ def build(mock_text: str, seed_dir: Path):
     adjacent, pending = build_adjacent(lines, stations, mapping, failed)
     transfers = build_transfers(confirmed, evidence, code_line)
 
-    verified_rows = [
+    provisional_rows = [
         ["ADJACENT", a, la, b, lb, SOURCE_ADJACENT, f"FE_SEGMENT_{kind}+CODE_SEQUENCE"]
         for (a, la, b, lb), kind in sorted(adjacent.items())
-    ] + [
+    ]
+    verified_rows = [
         ["TRANSFER", a, la, b, lb, SOURCE_TRANSFER, "CONFIRMED_GROUP"]
         for a, la, b, lb in sorted(transfers)
     ]
@@ -284,12 +292,13 @@ def build(mock_text: str, seed_dir: Path):
                     ["BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE", line, f"{a}-{b}", "PENDING",
                      "역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)"]
                 )
-    return verified_rows, review_rows, {
+    return verified_rows, provisional_rows, review_rows, {
         "mapping_success": len(mapping),
         "mapping_failed": len(failures),
         "mapping_failed_by_reason": dict(collections.Counter(f[3] for f in failures)),
         "name_variants_accepted": sum(1 for b in mapping.values() if b[1] != "exact"),
-        "adjacent_verified": len(adjacent),
+        "adjacent_verified": 0,  # 공식 인접 증명 출처가 없어 0이다
+        "adjacent_provisional": len(adjacent),
         "adjacent_pending": len(pending),
         "transfer_verified": len(transfers),
         "confirmed_transfer_groups": len(confirmed),
@@ -310,12 +319,13 @@ def main() -> int:
     parser.add_argument("--out-dir", type=Path, default=Path("data/seed"))
     args = parser.parse_args()
     try:
-        verified, review, stats = build(args.mock_js.read_text(encoding="utf-8"), args.seed_dir)
+        verified, provisional, review, stats = build(args.mock_js.read_text(encoding="utf-8"), args.seed_dir)
     except (BuildError, OSError) as exc:
         print(f"오류: {exc}", file=sys.stderr)
         return 1
     args.out_dir.mkdir(parents=True, exist_ok=True)
     write_csv(args.out_dir / "station_edges_verified.csv", VERIFIED_HEADER, verified)
+    write_csv(args.out_dir / "station_edges_provisional.csv", VERIFIED_HEADER, provisional)
     write_csv(args.out_dir / "station_edges_review.csv", REVIEW_HEADER, review)
     manifest = {
         "frontend_mock": {
@@ -324,10 +334,15 @@ def main() -> int:
             "used_fields": ["lines[].segments", "lines[].loop", "stations[].name", "stations[].lines"],
             "not_used": ["elevators", "alternativeTips", "demoScenarios", "x/y coordinates"],
         },
-        "adjacent_source": SOURCE_ADJACENT,
+        "grades": {
+            "VERIFIED": "공식 출처가 관계를 직접 증명(OA-13290 환승 기록). TRANSFER만 해당",
+            "PROVISIONAL": "프론트 순서와 공식 역번호 연속성이 일치하는 ADJACENT. 공식 인접 증명 아님. 기본 로더 적재 제외",
+            "PENDING": "그 밖의 후보. 적재 안 함",
+        },
+        "adjacent_source_provisional": SOURCE_ADJACENT,
         "transfer_source": SOURCE_TRANSFER,
         "direction_policy": "한 쌍당 한 행(from은 역번호가 작은 쪽). 소비하는 쪽은 무방향으로 취급",
-        "adjacent_evidence_limit": "공식 인접역 데이터셋 대조가 아니라 역번호 연속성에 의한 교차 검증",
+        "adjacent_evidence_limit": "공식 인접역 자료 없음. 역번호 연속성은 인접 관계의 공식 증명이 아니다",
         "stats": stats,
         "review_rows": len(review),
     }

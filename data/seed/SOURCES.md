@@ -126,28 +126,49 @@ uv run python -m app.cli.load_seed
 
 > 생성: `python scripts/build_edge_seed.py --mock-js <프론트 목업 JS>` (DB에 쓰지 않는다). 적재: `python -m app.cli.load_edges` (기본 dry-run, `--apply`일 때만 반영).
 
+### 검증 등급
+
+| 등급 | 뜻 | 건수 | 기본 적재 |
+|---|---|---|---|
+| **VERIFIED** | 공식 출처가 관계를 직접 증명함 | **TRANSFER 38** (ADJACENT **0**) | 예 |
+| **PROVISIONAL** | 프론트 순서와 공식 역번호 연속성이 일치하는 ADJACENT. **공식 인접 증명이 아님** | ADJACENT 239 | **아니오** |
+| **PENDING** | 그 밖의 후보(매핑 실패, 역번호 불연속, 순환 연결, 프론트 환승 미확인 등) | ADJACENT 36 + 매핑 실패 24 + 기타 | 아니오 |
+
+- **공식 인접역 관계를 직접 증명하는 출처가 없다.** 프론트 목업 순서와 OA-12035 역번호 연속성은 서로 독립된 교차 확인이지만, 역번호가 인접역을 공식적으로 정의한다는 근거는 없다. 그래서 ADJACENT 239건은 VERIFIED가 아니라 PROVISIONAL이다.
+- 공식 인접역·역간거리 자료(예: 서울교통공사 인접역 정보)로 대조해 승격하기 전까지, 기본 로더와 일반 `--apply`는 ADJACENT를 적재하지 않는다. 로더는 입력에 공식 근거 없는 간선이 섞여 있으면 DB에 손대기 전에 전체를 거부한다.
+
+### 파일
+
 | 파일 | 내용 |
 |---|---|
-| `station_edges_verified.csv` | 적재 가능한 간선(VERIFIED)만. 로더의 유일한 입력이며 로더가 규칙을 다시 검증한다 |
-| `station_edges_review.csv` | PENDING, 매핑 실패, 역명 변형, 프론트 환승 미확인 등 검토 목록. **적재하지 않는다** |
-| `station_edges_manifest.json` | 프론트 파일 SHA-256, 사용·미사용 필드, 건수, 정책 |
+| `station_edges_verified.csv` | VERIFIED(TRANSFER 38)만. 기본 로더의 유일한 입력이며 로더가 규칙을 다시 검증한다 |
+| `station_edges_provisional.csv` | PROVISIONAL(ADJACENT 239). 기본 로더는 읽지 않는다 |
+| `station_edges_review.csv` | PENDING, 매핑 실패, 역명 변형, 프론트 환승 미확인 목록. 적재하지 않는다 |
+| `station_edges_manifest.json` | 프론트 파일 SHA-256, 사용·미사용 필드, 등급 정의, 건수 |
 
-**입력.** 프론트 목업의 `lines[].segments`, `lines[].loop`, `stations[].name`, `stations[].lines`만 읽는다. `elevators`, `alternativeTips`, `demoScenarios`, 화면 좌표(x, y)는 읽지도 저장하지도 않는다. 원본 파일은 저장소에 두지 않는다(해시만 기록).
+### 입력
 
-**ADJACENT 검증 (모두 만족해야 VERIFIED).**
-1. 프론트 segments에서 연속한 두 역이다. 본선과 지선은 구분해 `evidence`에 기록한다.
+프론트 목업의 `lines[].segments`, `lines[].loop`, `stations[].name`, `stations[].lines`만 읽는다. `elevators`, `alternativeTips`, `demoScenarios`, 화면 좌표(x, y)는 읽지도 저장하지도 않는다. 원본 파일은 저장소에 두지 않는다(해시만 기록).
+
+### TRANSFER (VERIFIED)
+
+기존 OA-13290 확정 환승 그룹 34개의 모든 쌍(38개)만이다. 프론트의 환승 표기는 근거가 아니다. 로더는 (1) 쌍이 확정 그룹 안에 있고 (2) OA-13290 기록이 양방향으로 있고 (3) 확정 그룹의 모든 쌍이 빠짐없이 있는지 다시 확인한다. DB에서는 그룹 코드들이 같은 `station_id`의 서로 다른 `station_line_id`로 이어져야 하며, 아니면 롤백한다.
+
+### ADJACENT (PROVISIONAL) 조건
+
+1. 프론트 segments에서 연속한 두 역이다. 본선과 지선은 `evidence`에 구분해 기록한다.
 2. 같은 노선의 백엔드 역(OA-12035 코드) 하나로 유일하게 매핑된다. 노선을 넘어 역명만으로 병합하지 않는다.
 3. 두 역의 공식 역번호(OA-12035)가 같은 노선에서 1 차이다.
-4. 순환선(2호선 loop)의 마지막-첫 역 연결은 공식 근거가 없어 PENDING이다.
+4. 순환선(2호선 loop)의 마지막-첫 역 연결은 근거가 없어 PENDING이다.
 
-**TRANSFER 검증.** 기존 OA-13290 확정 환승 그룹 34개의 모든 쌍(38개)만 VERIFIED다. 프론트의 환승 표기는 근거가 아니다.
+### 방향·source
 
-**방향 정책.** 한 쌍당 한 행이고 `from`은 역번호가 작은 쪽이다. 반대 방향 행이 이미 있으면 같은 간선으로 보고 새로 만들지 않는다. 소비하는 쪽(BFS 등)은 무방향으로 취급한다. 같은 쌍에 다른 유형·출처가 이미 있으면 충돌로 전체를 롤백한다.
+- 한 쌍당 한 행이고 `from`은 역번호가 작은 쪽이다. 반대 방향 행이 이미 있으면 같은 간선으로 보고 새로 만들지 않는다. 소비하는 쪽(BFS 등)은 무방향으로 취급한다. 같은 쌍에 다른 유형·출처가 이미 있으면 충돌로 전체를 롤백한다.
+- source: TRANSFER `OA-13290`(공식), ADJACENT `OA-12035+FE-MOCK`(PROVISIONAL 전용, 공식 증명 아님).
 
-**source 값.** ADJACENT는 `OA-12035+FE-MOCK`, TRANSFER는 `OA-13290`이다.
+### 한계
 
-**한계 (중요).**
-- 인접 간선의 공식 근거는 **역번호 연속성**이다. 공식 인접역·역간거리 데이터셋과 대조한 것이 아니다. 그런 자료로 교차 확인하기 전까지 인접 간선은 "프론트 순서와 공식 역번호가 일치함" 수준이다.
-- 역번호가 연속하지 않는 구간(예: 1호선 동묘앞, 2호선 성수·신정 지선 접점, 6호선 응암 순환부, 3호선 경찰병원 구간)과 시드에 없는 역(1호선 대부분, 까치산, 뚝섬유원지)은 PENDING이다. 건수는 manifest를 본다.
+- 인접 간선은 공식 증명이 없다(위 등급 참고). 대체역 API는 간선이 없으면 후보를 만들지 않고 빈 결과와 사유를 낸다.
+- 역번호가 연속하지 않는 구간(1호선 동묘앞, 2호선 성수·신정 지선 접점, 6호선 응암 순환부, 3호선 경찰병원 구간 등)과 시드에 없는 역(1호선 대부분, 까치산, 뚝섬유원지)은 PENDING이다. 건수는 manifest를 본다.
 - 간선 수는 실제 거리나 무장애 이동 가능성을 뜻하지 않는다.
-- 실제 `data/dev.db`에는 아직 적재하지 않았다(별도 승인 후 진행).
+- 실제 `data/dev.db`에는 적재하지 않았다(별도 승인 후 진행).

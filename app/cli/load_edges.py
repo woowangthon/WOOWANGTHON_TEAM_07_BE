@@ -1,9 +1,10 @@
-"""검증된 역 간선 적재 명령.
+"""공식 근거로 검증된 역 간선(VERIFIED, 현재 TRANSFER) 적재 명령.
 
     uv run python -m app.cli.load_edges            # 기본은 dry-run: 적용해 본 뒤 롤백한다
     uv run python -m app.cli.load_edges --apply    # 실제 반영(명시했을 때만)
 
 - data/seed/station_edges_verified.csv만 읽는다. 외부 API를 호출하지 않는다.
+- 공식 근거가 없는 ADJACENT(PROVISIONAL)는 읽지도 적재하지도 않는다. 이를 켜는 옵션은 없다.
 - 역 시드(load_seed)가 먼저 적재되어 있어야 한다.
 - 매핑 실패나 충돌이 있으면 전체를 롤백하고 종료 코드 1로 끝난다.
 - DB가 마이그레이션되지 않았거나 SQLite 파일이 없으면 종료 코드 2다.
@@ -70,7 +71,7 @@ def main(argv: list[str] | None = None) -> int:
     print("[dry-run] 변경 없음(롤백됨)" if report.dry_run else "적재 완료")
     for key in sorted(report.counts):
         print(f"  {key}: {report.counts[key]}")
-    print("  참고: 간선 수는 실제 거리나 무장애 이동 가능성을 뜻하지 않습니다.")
+    print("  참고: 공식 근거가 없는 인접 간선(PROVISIONAL)은 적재하지 않았습니다. 간선 수는 실제 거리나 무장애 이동 가능성이 아닙니다.")
     return EXIT_OK
 
 
