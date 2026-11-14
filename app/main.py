@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from app.errors import register_exception_handlers
-from app.routers import alternatives, departure_time, elevators, health, stations
+from app.routers import alternatives, arrivals, departure_time, elevators, health, stations
 
 
 def create_app() -> FastAPI:
@@ -12,6 +12,7 @@ def create_app() -> FastAPI:
     app.include_router(elevators.router)
     app.include_router(alternatives.router)
     app.include_router(departure_time.router)
+    app.include_router(arrivals.router)
     return app
 
 
