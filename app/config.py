@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # 기본값 2는 임시 기본값이다(계약 미확정).
     alternative_search_depth: int = Field(default=2, ge=1, le=10)
 
+    # 환경 변수 ARRIVAL_CACHE_TTL_SECONDS로 바꾼다. 실시간 도착 정보 메모리 캐시 보관 시간(초). 1~300만 허용한다.
+    arrival_cache_ttl_seconds: int = Field(default=30, ge=1, le=300)
+
     # 출발 권장 시각 계산의 추정 기본값(분, 0~120). 환경 변수로 바꾼다. 검증되지 않은 추정값이다.
     walk_to_station_minutes: int = Field(
         default=WALK_TO_STATION_DEFAULT, ge=SEGMENT_MINUTES_MIN, le=SEGMENT_MINUTES_MAX

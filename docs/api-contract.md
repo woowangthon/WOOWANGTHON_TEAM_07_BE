@@ -86,6 +86,7 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 | 5 | GET | `/api/stations/{station_id}/alternatives` | 8절 (예약) | #33 | 후속 확정 |
 | 6 | GET | `/api/routes` | 8절 (예약) | #37 | 후속 확정 |
 | 7 | POST | `/api/departure-time` | 8.2절 | #39 | 계약 초안(구현됨, 시간표 미사용) |
+| 8 | GET | `/api/stations/{station_id}/arrivals` | 8.3절 | #40, #41 | 계약 초안(구현됨, 외부 출처 미연동) |
 
 ---
 
@@ -480,7 +481,7 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 | `GET /api/stations/{station_id}/alternatives` | #33 | `limitations` 항상 포함. 실제 접근 가능성은 미검증이라고 명시 |
 | `GET /api/routes` | #37 | `estimated: true` 포함. `limitations` 포함. 경로 없음 응답은 계약에서 정한다 |
 | `POST /api/departure-time` | #39 | `estimated`, `limitations` 포함. 계산 결과를 DB에 저장하지 않음 |
-| 실시간 도착 정보 | #40, #41 | 외부 실패 시 "미확인" 표시. 이전 캐시를 현재 정보처럼 보여 주지 않음 |
+| `GET /api/stations/{station_id}/arrivals` | #40, #41 | 8.3절. 외부 실패 시 "미확인" 표시. 이전 캐시를 현재 정보처럼 보여 주지 않음 |
 
 ### 8.1 대체역 `GET /api/stations/{station_id}/alternatives` (#33, 초안 — FE/AI 리뷰 전)
 
@@ -556,9 +557,22 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 
 **오류.** 0.6절 형식이다. 잘못된 시각·형식, 정수가 아닌 값, 범위 밖 값, 알 수 없는 필드, 깨진 JSON, 표현 가능한 날짜 범위를 벗어난 시각은 422 `VALIDATION_ERROR`, GET 등 다른 메서드는 405다.
 
-**미구현(보류).** 경로 탐색(#37), 시간표 기반 탑승 열차 선택(#35 이후), 실시간 도착(#40, #41), 엘리베이터 경고의 역·설비 연동, AI 최적 경로 추천.
+**미구현(보류).** 경로 탐색(#37), 시간표 기반 탑승 열차 선택(#35 이후), 실시간 도착의 외부 출처 연동(#40, #41), 엘리베이터 경고의 역·설비 연동, AI 최적 경로 추천.
 
 ---
+
+### 8.3 실시간 도착 정보 `GET /api/stations/{station_id}/arrivals` (#40, #41, 초안 — FE/AI 리뷰 전)
+
+**외부 출처는 연동되지 않았다.** OA-12764의 호출 주소, 서비스 이름, 응답 필드는 저장소에서 검증되지 않았다(미검증). 그래서 Backend는 자체 정규화 모델과 공급자 인터페이스만 두고, 공급자가 없으면 항상 `UNCONFIRMED`를 돌려준다. 과거 데이터나 만들어 낸 값은 돌려주지 않는다.
+
+- 응답: `station`, `arrival_status`, `unconfirmed_reason`, `arrivals[]`, `count`, `fetched_at`, `cache_hit`, `cache_ttl_seconds`, `limitations`.
+- `arrival_status`: `CONFIRMED`(도착 1건 이상), `EMPTY`(조회는 성공했으나 도착 정보 없음), `UNCONFIRMED`(확인하지 못함).
+- `unconfirmed_reason`: `UNCONFIRMED`일 때만 `PROVIDER_NOT_CONFIGURED`(출처 미연동) 또는 `PROVIDER_ERROR`(외부 오류·시간 초과·해석 불가). 그 밖에는 `null`.
+- `arrivals[]`(`eta_seconds` 순): `line`, `direction`, `destination`(없으면 `null`), `eta_seconds`(`fetched_at` 시점의 남은 시간), `estimated_arrival_at`(`fetched_at + eta_seconds`, KST).
+- `fetched_at`: 외부에서 가져온 시각(KST). `UNCONFIRMED`이면 `null`. 캐시에서 준 경우 `cache_hit`이 `true`이고 `fetched_at`은 원래 가져온 시각이다.
+- 캐시: 메모리, 성공한 조회만 `ARRIVAL_CACHE_TTL_SECONDS`(기본 30, 1~300) 동안 보관한다. DB 테이블은 없다. 만료 항목은 조회·저장 때 제거하고 항목 수는 512개로 제한한다. **외부 조회가 실패하면 이전 캐시 값을 돌려주지 않는다.**
+- 오류: 없거나 0 이하인 역 ID는 404, 정수가 아니면 422(0.6절). 외부 실패는 오류가 아니라 200 + `UNCONFIRMED`다.
+- 미결정: 출발 시각 API(8.2절)에 실시간 정보를 넣을지(#41). 지금은 넣지 않았다.
 
 ## 9. 실제 데이터에서 확인되지 않은 항목 (미검증)
 
@@ -574,6 +588,7 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 | TTL | 기본 120분(임시, 설정 가능, 1~1440분). 갱신 주기 미검증 (D1) |
 | 엘리베이터 종류 | 응답의 `ELVTR_SE` 중 `EV`만 저장한다. `ES`(에스컬레이터), `WL`(휠체어리프트), `MW`(무빙워크)는 제외한다 |
 | 호출 한도 | 미측정 |
+| 실시간 도착(OA-12764) | 호출 주소·서비스 이름·응답 필드·갱신 주기·호출 한도 모두 미검증. 실제 연동 보류 |
 
 ---
 
