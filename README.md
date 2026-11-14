@@ -64,7 +64,7 @@ uv run python scripts/demo_check.py
 
 ## 시연 서버 실행 (집 데스크탑, 터미널) (#45)
 
-**결정(2026-11-14): 시연 서버는 집 데스크탑에서 터미널로 직접 실행한다.** Docker, Redis, PostgreSQL은 쓰지 않는다. SQLite 파일(`data/dev.db`)을 그대로 쓰고 호스팅·HTTPS·영속 디스크 문제는 없다. 서버는 상주하는 프로세스 1개다.
+**결정(2026-11-14): 시연 서버는 집 데스크탑에서 터미널로 직접 실행한다.** Docker, Redis, PostgreSQL은 쓰지 않는다. SQLite 파일(`data/dev.db`)을 그대로 쓰고 호스팅·HTTPS·영속 디스크 문제는 없다. 서버는 상주하는 프로세스 1개다. 실행 기록, 실패 시 동작, 백업, 점검 호출 예는 [docs/demo-runbook.md](docs/demo-runbook.md)에 있다.
 
 ### 1회 준비 (순서대로)
 
