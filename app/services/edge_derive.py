@@ -6,6 +6,7 @@
 - 같은 노선 안의 연속 정차만 간선이 된다. 노선이 다르면 건너뛴다.
 - 이웃한 두 역의 시간 차가 MAX_GAP_SECONDS를 넘으면 시간표 오류로 보고 제외한다.
 - 서로 다른 열차가 MIN_TRAINS번 이상 확인한 쌍만 간선으로 인정한다.
+- 급행 표시가 없는 무정차 열차(회송·입출고로 추정)가 먼 역을 잇는 일이 있다. 두 역 중 더 적게 확인된 쪽의 최다 지지 간선 대비 MIN_RELATIVE_SUPPORT 미만이면 제외한다.
 - 한 쌍은 한 행이다(from_station_line_id가 작은 쪽). 소비하는 쪽은 무방향으로 취급한다.
 - source는 "OA-101"이다. 시간표 기반 추출이며 공식 인접역 자료는 아니다. 기존 간선은 지우거나 덮어쓰지 않는다.
 - 외부 API를 호출하지 않는다.
@@ -22,6 +23,7 @@ from app.models import StationEdge, StationLine, TrainSchedule
 SOURCE_TIMETABLE = "OA-101"
 MAX_GAP_SECONDS = 20 * 60
 MIN_TRAINS = 2
+MIN_RELATIVE_SUPPORT = 0.2
 
 
 @dataclass
@@ -74,13 +76,25 @@ def derive_adjacent_pairs(
     stats["trains_scanned"] = len(trains)
     kept = {pair: n for pair, n in support.items() if n >= min_trains}
     stats["pairs_below_min_trains"] = len(support) - len(kept)
-    return kept, stats
+
+    strongest: Counter = Counter()
+    for (a, b), n in kept.items():
+        strongest[a] = max(strongest[a], n)
+        strongest[b] = max(strongest[b], n)
+    steady = {
+        (a, b): n for (a, b), n in kept.items() if n >= MIN_RELATIVE_SUPPORT * min(strongest[a], strongest[b])
+    }
+    stats["pairs_below_relative_support"] = len(kept) - len(steady)
+    return steady, stats
 
 
 def load_derived_edges(
-    session: Session, *, dry_run: bool = False, min_trains: int = MIN_TRAINS
+    session: Session, *, dry_run: bool = False, min_trains: int = MIN_TRAINS, prune: bool = False
 ) -> DeriveReport:
-    """시간표에서 뽑은 인접 간선을 적재한다. 같은 입력을 다시 넣어도 행이 늘지 않는다."""
+    """시간표에서 뽑은 인접 간선을 적재한다. 같은 입력을 다시 넣어도 행이 늘지 않는다.
+
+    prune=True면 이번 추출에 없는 기존 OA-101 ADJACENT 간선을 지운다(다른 source는 건드리지 않는다).
+    """
     report = DeriveReport(dry_run=dry_run)
     try:
         pairs, stats = derive_adjacent_pairs(session, min_trains=min_trains)
@@ -115,6 +129,19 @@ def load_derived_edges(
             existing[(a, b)] = ("ADJACENT", SOURCE_TIMETABLE)
             report.counts["adjacent_created"] += 1
             report.pairs.append((a, b))
+        if prune:
+            wanted = {(min(a, b), max(a, b)) for a, b in pairs}
+            stale = session.scalars(
+                select(StationEdge).where(StationEdge.edge_type == "ADJACENT", StationEdge.source == SOURCE_TIMETABLE)
+            ).all()
+            for edge in stale:
+                key = (
+                    min(edge.from_station_line_id, edge.to_station_line_id),
+                    max(edge.from_station_line_id, edge.to_station_line_id),
+                )
+                if key not in wanted:
+                    session.delete(edge)
+                    report.counts["adjacent_pruned"] += 1
         session.flush()
         if dry_run:
             session.rollback()
