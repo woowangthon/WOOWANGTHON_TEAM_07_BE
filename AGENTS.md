@@ -3,7 +3,7 @@
 이 레포에서 작업하는 AI 코딩 에이전트(Gemini, Claude, Codex 등)가 **가장 먼저** 읽는 문서다.
 사람용 소개와 실행 방법은 [README.md](README.md)에 있다. 이 문서는 README를 복제하지 않고, "무엇을 지켜야 하고 어디를 봐야 하는가"만 적는다.
 
-> 이 문서는 브랜치 `feat/be-routes-timetable`의 13dfe1f(2026-11-14) 기준이다. 원격 `main`은 PR #68(342a9d0)까지이고, 이 브랜치의 시간표·경로 API 커밋 3개는 아직 `main`에 머지되지 않았을 수 있다(`git log origin/main..HEAD`로 확인). **코드와 `docs/api-contract.md`가 현재 사실**이고 이 문서는 길잡이다. 다르면 코드를 믿고, 이 문서를 고친다.
+> 이 문서는 `main` 5d2b26a(PR #69 머지, 2026-11-14) 기준이다. 시간표·경로 API·대기 5분·Windows 수정이 모두 `main`에 들어 있다. **코드와 `docs/api-contract.md`가 현재 사실**이고 이 문서는 길잡이다. 다르면 코드를 믿고, 이 문서를 고친다.
 
 ## 1. 이 레포는 무엇인가
 
@@ -98,7 +98,7 @@ uv run python -m app.cli.derive_edges --help          # 시간표에서 인접 �
 ## 7. 아직 결정되지 않은 것 (임의로 정하지 말고 사용자에게 묻는다)
 
 - **갱신 주기·TTL**: 현재 120분은 임시값이다(D1). OA-15994 갱신 주기를 확인한 뒤 확정한다.
-- **역 전체 목록 API**: AI가 요청 중이다(BE #14 코멘트). `GET /api/stations`는 `q`가 필수라 전체 목록을 받을 수 없어, AI는 `GET /api/stations/{id}`를 ID 1부터 차례로 조회하는 우회를 쓴다(ID가 연속이라는 가정에 기댐). `q` 생략 허용이나 별도 목록 API를 검토한다. **이 브랜치에는 아직 반영되지 않았다.**
+- **역 전체 목록 API**: AI가 요청 중이다(BE #14 코멘트). `GET /api/stations`는 `q`가 필수라 전체 목록을 받을 수 없어, AI는 `GET /api/stations/{id}`를 ID 1부터 차례로 조회하는 우회를 쓴다(ID가 연속이라는 가정에 기댐). `q` 생략 허용이나 별도 목록 API를 검토한다. **5d2b26a 기준 `main`에는 아직 반영되지 않았다.**
 - **경로·간선의 신뢰도**: 경로의 인접 간선은 시간표(OA-101)에서 추출한 것이고 공식 인접역 자료가 아니며, 소요 시간은 역 간 2분·환승 5분 가정이다. 엘리베이터만으로 이동 가능한 환승·출입 동선인지도 검증되지 않았다. 시연에서 경로를 어떻게 표현할지 팀 확인이 필요하다.
 - 팀 결정이 끝난 것(참고): `buffer_minutes` 기본 5분(D15), 서울 열린데이터광장 평문 HTTP 허용(D14), 인접 간선을 시간표에서 추출(D16), 상태 목록의 `line` 필터(D18).
 - **시연 데이터와 Mock 금지**: 데모 DB의 `[DEMO/SYNTHETIC]` 상태 5건을 시연에서 써도 되는지, 쓸 수 없다면 **실제 엘리베이터 수집(#44)을 시연 전에 돌려야 한다**. 실제 수집은 OA-15994 HTTPS 주소 확인과 호출 한도 확인이 선행된다.
@@ -117,7 +117,7 @@ uv run python -m app.cli.derive_edges --help          # 시간표에서 인접 �
 
 ## 9. 알려진 환경 문제 (Windows)
 
-- Windows에는 시간대 DB가 없어 `ZoneInfo("Asia/Seoul")`가 실패한다. **`tzdata` 패키지가 의존성에 있어야 한다**(`pyproject.toml`). 없으면 서버가 시작되지 않는다. *(da72d68에서 의존성으로 추가됨. `main`에 머지 전이면 `uv run --with tzdata`로 우회)*
+- Windows에는 시간대 DB가 없어 `ZoneInfo("Asia/Seoul")`가 실패한다. **`tzdata` 패키지가 의존성에 있어야 한다**(`pyproject.toml`). 없으면 서버가 시작되지 않는다. *(da72d68에서 의존성으로 추가됨)*
 - `alembic.ini`에 한글이 들어 있으면 cp949 로캘에서 `UnicodeDecodeError`가 난다(alembic과 `logging.config.fileConfig`가 로캘 인코딩으로 읽음). **`alembic.ini`는 ASCII로만 쓴다.** *(da72d68에서 ASCII로 바뀜)*
 - Windows에서는 심볼릭 링크·`chmod` 테스트가 건너뛰어진다(정상).
 - Git Bash의 `curl`은 한글 쿼리를 깨뜨린다. `--data-urlencode`를 쓰거나 Python `httpx`로 호출한다.
