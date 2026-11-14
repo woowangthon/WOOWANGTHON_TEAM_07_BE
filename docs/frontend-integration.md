@@ -1,7 +1,7 @@
 # FE/AI 연동 안내
 
 > 상태: 초안. 상세 필드와 규칙은 [api-contract.md](api-contract.md)가 기준이다. 이 문서는 연동에 필요한 요약이다.
-> 실행 방법은 README의 "FE/AI 로컬 연동 빠른 시작"을 본다. Base URL(로컬): `http://127.0.0.1:8000`
+> 시연 체크리스트는 [demo-handoff.md](demo-handoff.md), 배포 조건은 [deployment-considerations.md](deployment-considerations.md), 실행 방법은 README의 "FE/AI 로컬 연동 빠른 시작"을 본다. Base URL(로컬): `http://127.0.0.1:8000`
 
 ## 공통 규칙
 
@@ -24,37 +24,33 @@
 | POST | `/api/departure-time` | 권장 출발 시각 계산 | 시간표 미사용 추정 |
 | GET | `/api/stations/{station_id}/arrivals` | 실시간 도착 | 외부 출처 미연동, 항상 UNCONFIRMED |
 
-## 요청·응답 예시 (축약)
+## 요청·응답 예시
+
+아래 JSON은 데모 DB로 서버를 띄워 실제로 받은 응답이다(2026-11-14, 로컬). 긴 배열은 일부만 남겼다. 값(시각, 개수)은 데모 DB 기준이다.
 
 역 검색 `GET /api/stations?q=서울역`
 ```json
-{"stations":[{"station_id":1,"station_name":"서울역","lines":[{"line_id":"1","line_name":"1호선"}]}],"count":1,"limitations":[]}
+{"stations":[{"station_id":1,"station_name":"서울역","lines":[{"line_id":"1","line_name":"1호선"},{"line_id":"4","line_name":"4호선"}]}],"count":1,"limitations":["1호선은 일부 구간의 역만 포함되어 있어 전체 구간을 포함하지 않음"]}
 ```
 
-역별 엘리베이터 `GET /api/stations/1/elevators` (확인된 설비가 없는 경우)
+역별 엘리베이터 `GET /api/stations/1/elevators` (설비 6개 중 1개만 표시, 전부 정보 없음)
 ```json
-{"station":{"station_id":1,"station_name":"서울역"},
- "station_status":{"status":null,"data_fresh":false,"total_elevator_count":6,"unknown_elevator_count":6},
- "limitations":["확인 가능한 엘리베이터 상태가 없어 역 상태를 판정할 수 없음"],
- "elevators":[{"elevator_id":1,"status":null,"data_fresh":false,"unknown_reason":"STALE","observed_at":null,"fetched_at":"2026-11-13T09:00:00+09:00","...":"..."}]}
+{"station":{"station_id":1,"station_name":"서울역"},"station_status":{"status":null,"data_fresh":false,"total_elevator_count":6,"unknown_elevator_count":6},"limitations":["확인 가능한 엘리베이터 상태가 없어 역 상태를 판정할 수 없음"],"elevators":[{"elevator_id":1,"elevator_name":"승강기)엘리베이터-서울(1)역 2번 출구측 외부#1","location_description":"2번 출입구","operation_section":"B1-1F","status":null,"data_fresh":false,"unknown_reason":"STALE","observed_at":null,"fetched_at":"2026-11-13T09:00:00+09:00"}]}
 ```
 
-출발 시각 `POST /api/departure-time`
+출발 시각 `POST /api/departure-time` 요청 (`Content-Type: application/json`)
 ```json
-// 요청
-{"arrival_at":"2099-01-01T09:00:00+09:00","travel_minutes":30,"buffer_minutes":0}
-// 응답 (일부)
-{"recommended_departure_at":"2099-01-01T08:17:00+09:00","estimated_boarding_at":"2099-01-01T08:27:00+09:00",
- "estimated_alighting_at":"2099-01-01T08:57:00+09:00","arrival_at":"2099-01-01T09:00:00+09:00",
- "total_minutes":43,"estimated":true,"timetable_used":false,
- "elevator_warning":{"status":"UNCONFIRMED","items":[],"message":"..."},"limitations":["..."]}
+{"arrival_at":"2026-12-01T09:00:00+09:00","travel_minutes":30}
 ```
+응답
+```json
+{"recommended_departure_at":"2026-12-01T08:17:00+09:00","estimated_boarding_at":"2026-12-01T08:27:00+09:00","estimated_alighting_at":"2026-12-01T08:57:00+09:00","arrival_at":"2026-12-01T09:00:00+09:00","total_minutes":43,"date_changed":false,"already_past":false,"estimated":true,"timetable_used":false,"inputs":{"travel_minutes":30,"buffer_minutes":0,"walk_to_station_minutes":7,"station_entry_minutes":3,"exit_walk_minutes":3},"defaults_applied":["walk_to_station_minutes","station_entry_minutes","exit_walk_minutes"],"timeline":[{"kind":"WALK_TO_STATION","label":"집에서 역까지 도보","start_at":"2026-12-01T08:17:00+09:00","end_at":"2026-12-01T08:24:00+09:00","minutes":7},{"kind":"RIDE","label":"열차 이동(외부 입력 예상 시간)","start_at":"2026-12-01T08:27:00+09:00","end_at":"2026-12-01T08:57:00+09:00","minutes":30}],"elevator_warning":{"status":"UNCONFIRMED","items":[],"message":"역·설비 상태 정보가 입력되지 않아 엘리베이터 경고를 확인하지 못함"},"limitations":["실제 열차 시간표를 사용하지 않은 추정 계산이며 탑승 가능한 열차는 확인되지 않음","역·설비 상태 정보가 입력되지 않아 엘리베이터 경고를 확인하지 못함"]}
+```
+`timeline`은 실제로는 5구간(도보, 역 진입, 여유 시간, 열차 이동, 출구 이동)이고 `limitations`는 4개다. 위는 일부만 남긴 것이다.
 
 실시간 도착 `GET /api/stations/1/arrivals`
 ```json
-{"station":{"station_id":1,"station_name":"서울역"},"arrival_status":"UNCONFIRMED",
- "unconfirmed_reason":"PROVIDER_NOT_CONFIGURED","arrivals":[],"count":0,"fetched_at":null,
- "cache_hit":false,"cache_ttl_seconds":30,"limitations":["실시간 도착 정보 출처가 연동되지 않아 도착 시각을 확인하지 못함"]}
+{"station":{"station_id":1,"station_name":"서울역"},"arrival_status":"UNCONFIRMED","unconfirmed_reason":"PROVIDER_NOT_CONFIGURED","arrivals":[],"count":0,"fetched_at":null,"cache_hit":false,"cache_ttl_seconds":30,"limitations":["실시간 도착 정보 출처가 연동되지 않아 도착 시각을 확인하지 못함"]}
 ```
 
 ## 데이터 한계

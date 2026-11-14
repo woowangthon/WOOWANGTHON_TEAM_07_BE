@@ -35,11 +35,11 @@ uv sync
 cp .env.example .env
 #   CORS_ALLOWED_ORIGINS=http://localhost:5173   (쉼표로 여러 개, 와일드카드 불가, 기본은 비어 있어 교차 출처 불허)
 
-# 3. 데모 DB 생성 (임시 디렉터리). 마지막 줄 근처에 출력되는 "데모 DB: <경로>/demo.db"를 복사한다
+# 3. 데모 DB 생성 (임시 디렉터리). 출력의 "데모 DB: <절대경로>/demo.db" 줄을 복사한다
 uv run python -m app.cli.build_demo_db --include-provisional-adjacent
 
 # 4. 데모 DB로 서버 실행 (환경 변수가 .env보다 우선한다)
-DATABASE_URL=sqlite:////<위에서 출력된 경로>/demo.db uv run uvicorn app.main:app --port 8000
+DATABASE_URL=sqlite:///<위에서 출력된 절대경로>/demo.db uv run uvicorn app.main:app --port 8000
 
 # 5. 호출 확인 (한글 쿼리는 --data-urlencode로 보낸다)
 curl http://127.0.0.1:8000/health
@@ -49,6 +49,9 @@ curl http://127.0.0.1:8000/api/stations/1/alternatives
 curl -X POST http://127.0.0.1:8000/api/departure-time -H "Content-Type: application/json" \
   -d '{"arrival_at":"2026-12-01T09:00:00+09:00","travel_minutes":30}'
 curl http://127.0.0.1:8000/api/stations/1/arrivals
+
+# 6. 한 번에 점검 (로컬 서버만 대상. 데이터 없음·미확인은 WARN이며 실패가 아니다)
+uv run python scripts/demo_check.py
 ```
 
 - 자동 문서: 서버 실행 후 `http://127.0.0.1:8000/docs`(Swagger UI).
