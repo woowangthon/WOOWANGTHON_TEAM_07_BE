@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -65,6 +67,22 @@ def _elevator_warning(
     return warning, path
 
 
+def _recommend(body: DepartureTimeRequest, now: datetime, segments: dict[str, int], **train_times: datetime) -> dict:
+    try:
+        rec = recommend_departure(
+            parse_arrival_iso(body.arrival_at),
+            travel_minutes=body.travel_minutes,
+            buffer_minutes=body.buffer_minutes,
+            now=now.replace(microsecond=0),  # 서비스는 초 단위 시각만 받는다
+            **train_times,
+            **segments,
+        )
+        return to_kst_dict(rec)  # KST 변환. 날짜 범위를 벗어나면 OverflowError
+    except (ValueError, OverflowError) as exc:
+        message = str(exc) if isinstance(exc, ValueError) else "시각이 표현 가능한 범위를 벗어났습니다."
+        raise AppError(422, CODE_VALIDATION_ERROR, message) from None
+
+
 @router.post("/api/departure-time", response_model=DepartureTimeResponse)
 def calculate_departure_time(
     body: DepartureTimeRequest, session: Session = Depends(get_session)
@@ -88,18 +106,7 @@ def calculate_departure_time(
         segments[field] = value
 
     now = utc_now()
-    try:
-        rec = recommend_departure(
-            parse_arrival_iso(body.arrival_at),
-            travel_minutes=body.travel_minutes,
-            buffer_minutes=body.buffer_minutes,
-            now=now.replace(microsecond=0),  # 서비스는 초 단위 시각만 받는다
-            **segments,
-        )
-        data = to_kst_dict(rec)  # KST 변환. 날짜 범위를 벗어나면 OverflowError
-    except (ValueError, OverflowError) as exc:
-        message = str(exc) if isinstance(exc, ValueError) else "시각이 표현 가능한 범위를 벗어났습니다."
-        raise AppError(422, CODE_VALIDATION_ERROR, message) from None
+    data = _recommend(body, now, segments)
 
     warning, path = _elevator_warning(session, body, now)
 
@@ -115,20 +122,7 @@ def calculate_departure_time(
             if train is None:
                 train_note = DEP_TRAIN_NOT_FOUND
             else:
-                try:
-                    rec = recommend_departure(
-                        parse_arrival_iso(body.arrival_at),
-                        travel_minutes=body.travel_minutes,
-                        buffer_minutes=body.buffer_minutes,
-                        now=now.replace(microsecond=0),
-                        boarding_at=train.boarding_at,
-                        alighting_at=train.alighting_at,
-                        **segments,
-                    )
-                    data = to_kst_dict(rec)
-                except (ValueError, OverflowError) as exc:
-                    message = str(exc) if isinstance(exc, ValueError) else "시각이 표현 가능한 범위를 벗어났습니다."
-                    raise AppError(422, CODE_VALIDATION_ERROR, message) from None
+                data = _recommend(body, now, segments, boarding_at=train.boarding_at, alighting_at=train.alighting_at)
                 selected_train = SelectedTrainOut(
                     train_no=train.train_no,
                     boarding_at=to_kst_iso(train.boarding_at),
