@@ -3,7 +3,7 @@
 이 레포에서 작업하는 AI 코딩 에이전트(Gemini, Claude, Codex 등)가 **가장 먼저** 읽는 문서다.
 사람용 소개와 실행 방법은 [README.md](README.md)에 있다. 이 문서는 README를 복제하지 않고, "무엇을 지켜야 하고 어디를 봐야 하는가"만 적는다.
 
-> 이 문서는 `main` 5d2b26a(PR #69 머지, 2026-11-14) 기준이다. 시간표·경로 API·대기 5분·Windows 수정이 모두 `main`에 들어 있다. **코드와 `docs/api-contract.md`가 현재 사실**이고 이 문서는 길잡이다. 다르면 코드를 믿고, 이 문서를 고친다.
+> 이 문서는 `main` 5d2b26a(PR #69 머지, 2026-11-14) 기준이다. 시간표·경로 API·대기 5분·Windows 수정이 모두 `main`에 들어 있다. 이후 변경은 **PR #74(OPEN, 리뷰 중, 브랜치 `feat/be-train-selection-edge-fix`)에만 있고 `main`에는 없다**: 순환 종착 시간표 병합, 간선 지지 비율 필터와 `--prune`, 시간표 기반 열차 선택(#38, `selected_train`). **코드와 `docs/api-contract.md`가 현재 사실**이고 이 문서는 길잡이다. 다르면 코드를 믿고, 이 문서를 고친다.
 
 ## 1. 이 레포는 무엇인가
 
@@ -18,7 +18,7 @@ Python 3.13, FastAPI, SQLite(SQLAlchemy + Alembic), 패키지 관리 `uv`.
 ## 2. 읽는 순서
 
 1. 이 문서
-2. [docs/api-contract.md](docs/api-contract.md) — API 응답 계약, 상태 판정 규칙(§6), 결정 사항 D1~D13, 미검증 항목(§9). **API를 만지기 전에 필독**
+2. [docs/api-contract.md](docs/api-contract.md) — API 응답 계약, 상태 판정 규칙(§6), 결정 사항 D1~D18, 미검증 항목(§9). **API를 만지기 전에 필독**
 3. [docs/frontend-integration.md](docs/frontend-integration.md) — FE/AI가 쓰는 API 요약
 4. [docs/demo-handoff.md](docs/demo-handoff.md), [docs/deployment-considerations.md](docs/deployment-considerations.md) — 시연과 배포 조건(배포 대상은 미정)
 5. [docs/api-notes.md](docs/api-notes.md) — 외부 API(OA-15994 등) 실제 응답 조사 기록
@@ -70,7 +70,8 @@ uv run python -m app.cli.derive_edges --help          # 시간표에서 인접 �
 | 출발 시각 기본값 | `app/departure_defaults.py`, `app/config.py` | 계약 §8.2, `tests/test_departure_time*.py`. 기본: 도보 7·진입 3·출구 3·대기(buffer) **5**분 (D15) |
 | 경로 탐색·경고 | `app/services/routing.py`(다익스트라), `route_service.py`, `route_warning.py`, `app/routers/routes.py`, `app/schemas/routes.py` | 계약 §8.4, `tests/test_routes_api.py`. 가중치 `ROUTE_SEGMENT_MINUTES`(2)·`ROUTE_TRANSFER_MINUTES`(5)는 설정 |
 | 열차 시간표 | `app/models/train_schedules.py`, `app/services/timetable.py`·`timetable_ingest.py`, `app/cli/collect_timetable.py` | `alembic/versions/c4a91f27e6b3_*`, `tests/test_timetable.py`. 시각은 서비스일 기준 정수 초, 24시 넘는 시각 변환 |
-| 인접 간선 추출 | `app/services/edge_derive.py`, `app/cli/derive_edges.py` | 계약 §8.4·§9, `data/seed/SOURCES.md` |
+| 인접 간선 추출 | `app/services/edge_derive.py`, `app/cli/derive_edges.py` | 계약 §8.4·§9, `data/seed/SOURCES.md`. 지지 비율 필터(`MIN_RELATIVE_SUPPORT` 20%)와 `--prune`은 PR #74(머지 전) |
+| 열차 선택(출발 시각) | `app/services/train_selection.py`(PR #74, 머지 전) | 계약 §0.4·§8.2, `tests/test_train_selection.py`. 방향은 정차 순서로 추정하며 근거가 없으면 기존 추정으로 폴백 |
 | DB 모델 | `app/models/*.py` | **Alembic 마이그레이션**(`alembic/versions/`), `tests/test_schema.py` |
 | 역·노선·간선 시드 | `data/seed/`, `app/services/station_seed.py`·`edge_seed.py`, `app/cli/load_*.py` | `data/seed/SOURCES.md`, 시드 테스트. **원본 CSV 해시는 `manifest.json`에 있다** |
 | 외부 API 클라이언트·파서 | `app/clients/` | `docs/api-notes.md`, 보안 테스트(키 노출·평문 HTTP 차단) |
@@ -99,6 +100,7 @@ uv run python -m app.cli.derive_edges --help          # 시간표에서 인접 �
 
 - **갱신 주기·TTL**: 현재 120분은 임시값이다(D1). OA-15994 갱신 주기를 확인한 뒤 확정한다.
 - **역 전체 목록 API**: AI가 요청 중이다(BE #14 코멘트). `GET /api/stations`는 `q`가 필수라 전체 목록을 받을 수 없어, AI는 `GET /api/stations/{id}`를 ID 1부터 차례로 조회하는 우회를 쓴다(ID가 연속이라는 가정에 기댐). `q` 생략 허용이나 별도 목록 API를 검토한다. **5d2b26a 기준 `main`에는 아직 반영되지 않았다.**
+- **데이터 현황 (2026-11-14, `data/dev.db`, 사용자 승인 후 적재)**: 시드 역 240개·환승 간선 38개, 엘리베이터 866건 수집, 시간표(OA-101) 전체 수집 279,458행, 시간표에서 추출한 인접 간선 269개(`--prune` 후). 순환 종착 병합 1,142건. 합성 상태 5건이 남아 있는지는 (미검증). 시간표는 공휴일 데이터가 없어 평일·토·일만 구분한다. 시간표 수집 역 276개와 시드 240개의 차이는 (미검증, #16).
 - **경로·간선의 신뢰도**: 경로의 인접 간선은 시간표(OA-101)에서 추출한 것이고 공식 인접역 자료가 아니며, 소요 시간은 역 간 2분·환승 5분 가정이다. 엘리베이터만으로 이동 가능한 환승·출입 동선인지도 검증되지 않았다. 시연에서 경로를 어떻게 표현할지 팀 확인이 필요하다.
 - 팀 결정이 끝난 것(참고): `buffer_minutes` 기본 5분(D15), 서울 열린데이터광장 평문 HTTP 허용(D14), 인접 간선을 시간표에서 추출(D16), 상태 목록의 `line` 필터(D18).
 - **시연 데이터와 Mock 금지**: 데모 DB의 `[DEMO/SYNTHETIC]` 상태 5건을 시연에서 써도 되는지, 쓸 수 없다면 **실제 엘리베이터 수집(#44)을 시연 전에 돌려야 한다**. 실제 수집은 OA-15994 HTTPS 주소 확인과 호출 한도 확인이 선행된다.
@@ -109,7 +111,7 @@ uv run python -m app.cli.derive_edges --help          # 시간표에서 인접 �
 
 | 대상 | 관계 |
 |---|---|
-| **AI 레포**(`../AI`) | AI의 `src/data/be_source.py`가 이 API를 호출한다. 현재 읽는 API: `GET /api/stations/{id}`, `/api/stations/{id}/elevators`, `/api/elevators/status`, `/api/stations/{id}/alternatives`, `POST /api/departure-time`. **`GET /api/routes`와 출발 시각의 `from/to` 역 id, 상태 목록의 `line` 필터는 BE에 새로 생겼고 AI는 아직 연동 전이다**(AI 이슈 #6, #12에서 진행 예정). **응답 필드명·상태 값·limitations 문구를 바꾸면 AI의 변환 코드와 테스트 픽스처(`AI/tests/data/fixtures/`)가 깨질 수 있다.** 바꿀 때 PR 본문에 "AI 영향"을 적는다. AI는 `limitations`를 사용자에게 그대로 전달한다. AI의 가이드: `../AI/AGENTS.md`, 연동 현황: `../AI/docs/IMPLEMENTATION_STATUS.md` §4.8 |
+| **AI 레포**(`../AI`) | AI의 `src/data/be_source.py`가 이 API를 호출한다. 현재 읽는 API: `GET /api/stations/{id}`, `/api/stations/{id}/elevators`, `/api/elevators/status`, `/api/stations/{id}/alternatives`, `POST /api/departure-time`. **`GET /api/routes`와 출발 시각의 `from/to` 역 id, 상태 목록의 `line` 필터는 BE에 새로 생겼고 AI는 아직 연동 전이다**(AI 이슈 #6, #12에서 진행 예정). **응답 필드명·상태 값·limitations 문구를 바꾸면 AI의 변환 코드와 테스트 픽스처(`AI/tests/data/fixtures/`)가 깨질 수 있다.** 바꿀 때 PR 본문에 "AI 영향"을 적는다. AI는 `limitations`를 사용자에게 그대로 전달한다. PR #74 머지 후에는 출발 시각 응답에 `selected_train`(기본 `null`)이 추가되고 `timetable_used`가 `true`일 수 있다. AI는 이 필드를 읽지 않지만 `from/to`를 보내지 않아 지금은 켜지지 않는다. AI의 가이드: `../AI/AGENTS.md`, 연동 현황: `../AI/docs/IMPLEMENTATION_STATUS.md` §4.8 |
 | **FE** | `docs/frontend-integration.md`가 기준. CORS는 `CORS_ALLOWED_ORIGINS`에 FE 주소를 넣어야 열린다 |
 | 공용 문서 | `../docs/PROJECT-STATE.md`(프로젝트 전체 진행 상황, git 저장소 밖) |
 
