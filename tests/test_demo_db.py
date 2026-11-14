@@ -69,7 +69,7 @@ def test_counts_of_the_full_demo_db(demo):
         "elevators_real_sample": 866, "elevator_status_real_sample": 866,
         "elevators_synthetic": 5, "elevator_status_synthetic": 5,
     }
-    assert demo.result.manifest["kind"] == "DEMO" and demo.result.manifest["alembic"] == "b7e2c91a4d10"
+    assert demo.result.manifest["kind"] == "DEMO" and demo.result.manifest["alembic"] == "c4a91f27e6b3"
 
 
 def test_station_mapping_matches_a_seed_only_source_db(engine, tmp_path_factory):
