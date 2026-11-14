@@ -18,12 +18,51 @@ from dataclasses import dataclass, field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import StationEdge, StationLine, TrainSchedule
+from app.models import StationEdge, StationExternalId, StationLine, TrainSchedule
+from app.services.station_seed import SOURCE_OA12035
+from app.services.timetable import SERVICE_DAY_TYPES
 
 SOURCE_TIMETABLE = "OA-101"
 MAX_GAP_SECONDS = 20 * 60
 MIN_TRAINS = 2
 MIN_RELATIVE_SUPPORT = 0.2
+# --prune은 "이번 추출에 없는 간선"을 지운다. 시간표가 일부만 있으면 멀쩡한 간선도 없는 것으로 보이므로,
+# 수집 대상 역-노선의 이 비율 이상이 시간표를 갖고 요일 3종이 모두 있을 때만 허용한다.
+# 비율은 신설·미운행 역에 시간표가 비는 경우를 감안한 값이며 실제 DB로 검증하지 않았다(미검증).
+MIN_PRUNE_STATION_COVERAGE = 0.9
+
+
+@dataclass
+class TimetableCoverage:
+    expected_station_lines: int
+    covered_station_lines: int
+    missing_day_types: tuple[str, ...]
+
+    @property
+    def ratio(self) -> float:
+        return self.covered_station_lines / self.expected_station_lines if self.expected_station_lines else 0.0
+
+    @property
+    def sufficient_for_prune(self) -> bool:
+        return self.ratio >= MIN_PRUNE_STATION_COVERAGE and not self.missing_day_types
+
+
+def timetable_coverage(session: Session) -> TimetableCoverage:
+    """collect_timetable이 받을 수 있는 역-노선(OA-12035 연결) 중 시간표가 있는 비율과 빠진 요일 종류."""
+    expected = set(
+        session.scalars(
+            select(StationExternalId.station_line_id).where(
+                StationExternalId.source == SOURCE_OA12035, StationExternalId.station_line_id.is_not(None)
+            )
+        )
+    )
+    present = set(session.scalars(select(TrainSchedule.station_line_id).distinct()))
+    day_types = set(session.scalars(select(TrainSchedule.service_day_type).distinct()))
+    return TimetableCoverage(
+        expected_station_lines=len(expected),
+        covered_station_lines=len(expected & present),
+        missing_day_types=tuple(d for d in SERVICE_DAY_TYPES if d not in day_types),
+    )
 
 
 @dataclass

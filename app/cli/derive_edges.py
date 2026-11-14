@@ -6,8 +6,9 @@
 - 먼저 collect_timetable --apply로 train_schedules를 채워야 한다.
 - 환승 간선은 load_edges(공식 OA-13290 근거)가 맡는다. 이 명령은 ADJACENT만 만든다.
 - 기존 간선은 지우거나 덮어쓰지 않는다(--prune을 주면 이번 추출에 없는 OA-101 간선만 지운다). 같은 입력을 다시 넣어도 늘지 않는다.
+- --prune은 시간표가 전체 수집된 DB에서만 허용한다(역-노선 90% 이상, 요일 3종 모두). 미달이면 거부하고 아무것도 바꾸지 않는다. 커버리지는 dry-run에서도 출력한다.
 
-종료 코드: 0 정상, 1 적재 오류(롤백), 2 실행 준비 오류(DB 미준비, 시간표 없음)
+종료 코드: 0 정상, 1 적재 오류(롤백), 2 실행 준비 오류(DB 미준비, 시간표 없음, --prune 커버리지 미달)
 """
 
 import argparse
@@ -21,7 +22,13 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import make_engine
 from app.models import TrainSchedule
-from app.services.edge_derive import MIN_TRAINS, load_derived_edges
+from app.services.edge_derive import (
+    MIN_PRUNE_STATION_COVERAGE,
+    MIN_TRAINS,
+    TimetableCoverage,
+    load_derived_edges,
+    timetable_coverage,
+)
 
 EXIT_OK = 0
 EXIT_ERROR = 1
@@ -37,6 +44,15 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     mode.add_argument("--dry-run", action="store_true", help="적용해 본 뒤 롤백한다(기본).")
     mode.add_argument("--apply", action="store_true", help="실제로 반영한다.")
     return parser.parse_args(argv)
+
+
+def _coverage_line(coverage: TimetableCoverage) -> str:
+    missing = ", ".join(coverage.missing_day_types) or "없음"
+    verdict = "--prune 허용" if coverage.sufficient_for_prune else "--prune 거부 대상"
+    return (
+        f"시간표 커버리지: {coverage.covered_station_lines}/{coverage.expected_station_lines} 역-노선 "
+        f"({coverage.ratio:.0%}, 기준 {MIN_PRUNE_STATION_COVERAGE:.0%}), 빠진 요일: {missing} -> {verdict}"
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -57,6 +73,15 @@ def main(argv: list[str] | None = None) -> int:
         with Session(engine) as session:
             if session.scalar(select(func.count()).select_from(TrainSchedule)) == 0:
                 print("오류: train_schedules가 비어 있습니다. collect_timetable --apply를 먼저 실행하세요.", file=sys.stderr)
+                return EXIT_NOT_READY
+            coverage = timetable_coverage(session)
+            print(_coverage_line(coverage))
+            if args.prune and not coverage.sufficient_for_prune:
+                print(
+                    "오류: 시간표가 일부만 수집되어 --prune을 거부합니다. "
+                    "collect_timetable --apply로 전체를 수집한 뒤 다시 실행하세요. 변경 없음.",
+                    file=sys.stderr,
+                )
                 return EXIT_NOT_READY
             try:
                 report = load_derived_edges(session, dry_run=not args.apply, min_trains=args.min_trains, prune=args.prune)
