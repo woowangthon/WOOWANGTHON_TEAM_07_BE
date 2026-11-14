@@ -11,7 +11,7 @@ from sqlalchemy import event
 
 from app import config
 from app.models import Elevator, ElevatorStatus
-from app.services.status_messages import NO_CONFIRMED, NO_ELEVATORS, PARTIAL_UNKNOWN
+from app.services.status_messages import GLOBAL_SOME_UNKNOWN, NO_CONFIRMED, NO_ELEVATORS, PARTIAL_UNKNOWN
 from app.timeutil import to_utc_iso, utc_now
 
 RUNNING = "가동중"
@@ -209,7 +209,8 @@ def test_global_list_includes_every_elevator_with_station_name(client, seeded):
     body = response.json()
     assert set(body) == {"elevators", "count", "limitations"}
     assert body["count"] == len(body["elevators"]) == 9
-    assert body["limitations"] == []
+    # seeded에는 STALE(103, 202)과 NO_DATA(201)가 있으므로 GLOBAL_SOME_UNKNOWN이 붙는다.
+    assert body["limitations"] == [GLOBAL_SOME_UNKNOWN]
     first = body["elevators"][0]
     assert set(first) == {
         "elevator_id", "elevator_name", "station_id", "station_name",
@@ -226,6 +227,9 @@ def test_status_filter_keeps_only_confirmed_matches(client, seeded):
     # 오래된 103, 202와 행 없는 201은 어떤 필터에도 들어가지 않는다.
     assert [e["elevator_id"] for e in running["elevators"]] == [101, 301, 302, 601]
     assert stopped["count"] == 2
+    # 필터가 미확인 설비를 결과에서 제외해도 시스템에 존재하므로 limitations는 그대로다.
+    assert stopped["limitations"] == [GLOBAL_SOME_UNKNOWN]
+    assert running["limitations"] == [GLOBAL_SOME_UNKNOWN]
 
 
 def test_status_filter_accepts_percent_encoded_value(client, seeded):
@@ -248,6 +252,70 @@ def test_global_list_is_empty_when_no_elevators(client):
     body = client.get("/api/elevators/status").json()
 
     assert body == {"elevators": [], "count": 0, "limitations": []}
+
+
+def test_global_list_all_fresh_has_no_limitations(client, db):
+    """전부 신선한 설비만 있으면 limitations는 빈 배열이다."""
+    _add(db, 301, 3, RUNNING)
+    _add(db, 302, 3, RUNNING)
+    db.commit()
+
+    body = client.get("/api/elevators/status").json()
+
+    assert body["limitations"] == []
+    assert body["count"] == 2
+
+
+def test_global_list_with_stale_has_limitations(client, db):
+    """STALE 설비가 한 개라도 있으면 GLOBAL_SOME_UNKNOWN이 붙는다."""
+    _add(db, 101, 1, RUNNING)
+    _add(db, 102, 1, RUNNING, age=STALE_AGE)  # STALE
+    db.commit()
+
+    body = client.get("/api/elevators/status").json()
+
+    assert GLOBAL_SOME_UNKNOWN in body["limitations"]
+    assert body["count"] == 2  # 필터 없으면 STALE도 결과에 포함된다
+
+
+def test_global_list_with_no_data_has_limitations(client, db):
+    """NO_DATA 설비가 있으면 GLOBAL_SOME_UNKNOWN이 붙는다."""
+    _add(db, 201, 2)  # 상태 행 없음 → NO_DATA
+    _add(db, 301, 3, RUNNING)
+    db.commit()
+
+    body = client.get("/api/elevators/status").json()
+
+    assert GLOBAL_SOME_UNKNOWN in body["limitations"]
+
+
+def test_global_list_filter_still_shows_limitations_for_unknowns(client, db):
+    """필터를 적용해 미확인 설비가 결과에서 빠져도 limitations는 유지된다."""
+    _add(db, 101, 1, RUNNING)
+    _add(db, 201, 2)  # NO_DATA
+    db.commit()
+
+    body = client.get("/api/elevators/status", params={"status": RUNNING}).json()
+
+    # 결과에는 101만 나오지만 201(NO_DATA)이 시스템에 존재하므로 limitation이 붙는다.
+    assert [e["elevator_id"] for e in body["elevators"]] == [101]
+    assert GLOBAL_SOME_UNKNOWN in body["limitations"]
+
+
+def test_global_list_mix_fresh_and_stale_shows_limitation_and_unknown_reason(client, db):
+    """신선한 설비와 오래된 설비가 섞이면 각각 unknown_reason이 정확히 표시된다."""
+    _add(db, 101, 1, RUNNING)           # fresh
+    _add(db, 102, 1, RUNNING, age=STALE_AGE)  # STALE
+    _add(db, 201, 2)                    # NO_DATA
+    db.commit()
+
+    body = client.get("/api/elevators/status").json()
+
+    by_id = {e["elevator_id"]: e for e in body["elevators"]}
+    assert by_id[101]["data_fresh"] is True and by_id[101]["unknown_reason"] is None
+    assert by_id[102]["data_fresh"] is False and by_id[102]["unknown_reason"] == "STALE"
+    assert by_id[201]["data_fresh"] is False and by_id[201]["unknown_reason"] == "NO_DATA"
+    assert GLOBAL_SOME_UNKNOWN in body["limitations"]
 
 
 # ---------- DB 조회 횟수 (N+1 방지) ----------
