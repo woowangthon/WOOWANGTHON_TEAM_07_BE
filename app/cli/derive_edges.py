@@ -94,7 +94,7 @@ def main(argv: list[str] | None = None) -> int:
     print("[dry-run] 변경 없음(롤백됨)" if report.dry_run else "적재 완료")
     for key in sorted(report.counts):
         print(f"  {key}: {report.counts[key]}")
-    print("  참고: 시간표 기반 추출이며 공식 인접역 자료가 아닙니다. 급행은 제외했습니다.")
+    print("  참고: 시간표 기반 추출이며 공식 인접역 자료가 아닙니다. 급행 표시가 섞이거나 정차 시각이 겹친 열차는 제외했습니다.")
     return EXIT_OK
 
 

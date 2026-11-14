@@ -1,11 +1,14 @@
 """시간표(train_schedules)에서 인접역 간선(ADJACENT)을 뽑는다. 이슈 #16, #30, #31.
 
 방식: 같은 열차(train_no)가 정차하는 역을 시각 순으로 정렬해 이웃한 두 역을 인접역으로 본다.
-- 같은 (요일, 방향, train_no) 안에서만 묶는다. 시각이 없는 쪽(시발의 도착, 종착의 출발)은 있는 쪽 시각을 쓴다.
-- 급행(is_express)은 역을 건너뛰므로 제외한다. 일반 열차 정차 순서만 쓴다.
-- 같은 노선 안의 연속 정차만 간선이 된다. 노선이 다르면 건너뛴다.
+- 같은 (노선, 요일, 방향, train_no) 안에서만 묶는다. 같은 번호가 다른 노선에도 있으므로 노선을 섞지 않는다(#72).
+  시각이 없는 쪽(시발의 도착, 종착의 출발)은 있는 쪽 시각을 쓴다.
+- 급행(is_express)은 역을 건너뛴다. 급행 표시가 한 행이라도 있는 열차는 통째로 증거에서 뺀다.
+  급행 행만 빼고 앞뒤를 이으면 건너뛴 역을 사이에 둔 두 역이 인접으로 잡힌다(#72).
+- 서로 다른 역의 정차 시각이 같은 열차도 순서를 알 수 없으므로 통째로 뺀다(ID 순서로 잇지 않는다, #72).
 - 이웃한 두 역의 시간 차가 MAX_GAP_SECONDS를 넘으면 시간표 오류로 보고 제외한다.
-- 서로 다른 열차가 MIN_TRAINS번 이상 확인한 쌍만 간선으로 인정한다.
+- 서로 다른 열차 번호 MIN_TRAINS개 이상이 확인한 쌍만 간선으로 인정한다. 같은 번호가 요일·방향에 걸쳐
+  반복되어도 한 번으로 센다(#72).
 - 급행 표시가 없는 무정차 열차(회송·입출고로 추정)가 먼 역을 잇는 일이 있다. 두 역 중 더 적게 확인된 쪽의 최다 지지 간선 대비 MIN_RELATIVE_SUPPORT 미만이면 제외한다.
 - 한 쌍은 한 행이다(from_station_line_id가 작은 쪽). 소비하는 쪽은 무방향으로 취급한다.
 - source는 "OA-101"이다. 시간표 기반 추출이며 공식 인접역 자료는 아니다. 기존 간선은 지우거나 덮어쓰지 않는다.
@@ -75,7 +78,7 @@ class DeriveReport:
 def derive_adjacent_pairs(
     session: Session, *, min_trains: int = MIN_TRAINS
 ) -> tuple[dict[tuple[int, int], int], Counter]:
-    """(작은 station_line_id, 큰 station_line_id) -> 확인한 열차 수. 통계 Counter를 함께 돌려준다."""
+    """(작은 station_line_id, 큰 station_line_id) -> 확인한 서로 다른 열차 번호 수. 통계 Counter를 함께 돌려준다."""
     stats: Counter = Counter()
     line_of = dict(session.execute(select(StationLine.station_line_id, StationLine.line_id)).all())
     rows = session.execute(
@@ -89,31 +92,46 @@ def derive_adjacent_pairs(
             TrainSchedule.is_express,
         )
     )
-    trains: dict[tuple[str, int, str], list[tuple[int, int]]] = defaultdict(list)
+    # 같은 열차 번호가 다른 노선에도 있으므로 노선까지 묶음 키에 넣는다.
+    trains: dict[tuple[str | None, str, int, str], list[tuple[int, int]]] = defaultdict(list)
+    express_groups: set[tuple[str | None, str, int, str]] = set()
     for day_type, direction, train_no, sl_id, arrival, departure, is_express in rows:
+        key = (line_of.get(sl_id), day_type, direction, train_no)
         if is_express:
             stats["express_rows_skipped"] += 1
+            express_groups.add(key)
             continue
         when = departure if departure is not None else arrival
         if when is None:
             continue
-        trains[(day_type, direction, train_no)].append((when, sl_id))
+        trains[key].append((when, sl_id))
 
-    support: Counter = Counter()
-    for stops in trains.values():
+    # 쌍 -> 그 쌍을 이은 서로 다른 열차 번호. 쌍은 역-노선 id라 이미 노선별이다.
+    support: dict[tuple[int, int], set[str]] = defaultdict(set)
+    for key, stops in trains.items():
+        if key in express_groups:
+            # 급행 표시가 하나라도 있으면 열차 전체를 뺀다. 급행 행만 빼고 앞뒤를 이으면 건너뛴 역을 잇게 된다.
+            stats["express_trains_skipped"] += 1
+            continue
+        stations_at: dict[int, set[int]] = defaultdict(set)
+        for when, sl_id in stops:
+            stations_at[when].add(sl_id)
+        if any(len(ids) > 1 for ids in stations_at.values()):
+            # 서로 다른 역의 정차 시각이 같으면 순서를 알 수 없다. ID 순서로 잇지 않고 열차 전체를 뺀다.
+            stats["same_time_trains_skipped"] += 1
+            continue
+        stats["trains_scanned"] += 1
         stops.sort()
+        train_no = key[3]
         for (t1, a), (t2, b) in zip(stops, stops[1:]):
             if a == b:
-                continue
-            if line_of.get(a) != line_of.get(b):
-                stats["cross_line_skipped"] += 1
                 continue
             if t2 - t1 > MAX_GAP_SECONDS:
                 stats["gap_too_long_skipped"] += 1
                 continue
-            support[(min(a, b), max(a, b))] += 1
-    stats["trains_scanned"] = len(trains)
-    kept = {pair: n for pair, n in support.items() if n >= min_trains}
+            support[(min(a, b), max(a, b))].add(train_no)
+    # 같은 번호가 요일·방향에 반복되어도 한 번으로 센다.
+    kept = {pair: len(nos) for pair, nos in support.items() if len(nos) >= min_trains}
     stats["pairs_below_min_trains"] = len(support) - len(kept)
 
     strongest: Counter = Counter()

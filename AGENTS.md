@@ -70,8 +70,8 @@ uv run python -m app.cli.derive_edges --help          # 시간표에서 인접 �
 | 출발 시각 기본값 | `app/departure_defaults.py`, `app/config.py` | 계약 §8.2, `tests/test_departure_time*.py`. 기본: 도보 7·진입 3·출구 3·대기(buffer) **5**분 (D15) |
 | 경로 탐색·경고 | `app/services/routing.py`(다익스트라), `route_service.py`, `route_warning.py`, `app/routers/routes.py`, `app/schemas/routes.py` | 계약 §8.4, `tests/test_routes_api.py`. 가중치 `ROUTE_SEGMENT_MINUTES`(2)·`ROUTE_TRANSFER_MINUTES`(5)는 설정 |
 | 열차 시간표 | `app/models/train_schedules.py`, `app/services/timetable.py`·`timetable_ingest.py`, `app/cli/collect_timetable.py` | `alembic/versions/c4a91f27e6b3_*`, `tests/test_timetable.py`. 시각은 서비스일 기준 정수 초, 24시 넘는 시각 변환 |
-| 인접 간선 추출 | `app/services/edge_derive.py`, `app/cli/derive_edges.py` | 계약 §8.4·§9, `data/seed/SOURCES.md`. 지지 비율 필터(`MIN_RELATIVE_SUPPORT` 20%)와 `--prune`은 PR #74(머지 전) |
-| 열차 선택(출발 시각) | `app/services/train_selection.py`(PR #74, 머지 전) | 계약 §0.4·§8.2, `tests/test_train_selection.py`. 방향은 정차 순서로 추정하며 근거가 없으면 기존 추정으로 폴백 |
+| 인접 간선 추출 | `app/services/edge_derive.py`, `app/cli/derive_edges.py` | 계약 §8.4·§9, `data/seed/SOURCES.md`. 정차 묶음은 (노선, 요일, 방향, 열차 번호), 급행·동시각 열차는 통째로 제외, 지지 수는 서로 다른 열차 번호 수(#72). 지지 비율 필터(`MIN_RELATIVE_SUPPORT` 20%)와 `--prune`(커버리지 가드) |
+| 열차 선택(출발 시각) | `app/services/train_selection.py` | 계약 §0.4·§8.2, `tests/test_train_selection.py`. 방향은 정차 순서로 추정하며 근거가 없으면 기존 추정으로 폴백 |
 | DB 모델 | `app/models/*.py` | **Alembic 마이그레이션**(`alembic/versions/`), `tests/test_schema.py` |
 | 역·노선·간선 시드 | `data/seed/`, `app/services/station_seed.py`·`edge_seed.py`, `app/cli/load_*.py` | `data/seed/SOURCES.md`, 시드 테스트. **원본 CSV 해시는 `manifest.json`에 있다** |
 | 외부 API 클라이언트·파서 | `app/clients/` | `docs/api-notes.md`, 보안 테스트(키 노출·평문 HTTP 차단) |

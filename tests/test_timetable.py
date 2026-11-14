@@ -359,16 +359,19 @@ def test_derive_drops_long_gaps(mapped):
     assert (min(sl_id(mapped, 3), sl_id(mapped, 5)), max(sl_id(mapped, 3), sl_id(mapped, 5))) not in pairs
 
 
-def test_derive_skips_pairs_across_lines(mapped):
+def test_derive_keeps_lines_apart_for_same_train_number(mapped):
+    # 3호선 교대에 같은 번호(2001)가 있어도 노선별로 묶으므로 2호선 간선이 그대로 나오고 노선을 넘는 쌍은 없다(#72).
     other = sl_id(mapped, 5, "3")
     mapped.add(TrainSchedule(station_line_id=other, service_day_type="WEEKDAY", direction=1, train_no="2001",
                              arrival_time=21500, departure_time=21510, is_express=False, fetched_at="2026-11-14T03:00:00Z"))
     mapped.commit()
     ingest(mapped)
 
-    _, stats = derive_adjacent_pairs(mapped)
+    pairs, _ = derive_adjacent_pairs(mapped)
 
-    assert stats["cross_line_skipped"] >= 1
+    a, b, c = sl_id(mapped, 3), sl_id(mapped, 5), sl_id(mapped, 6)
+    assert pairs == {(min(a, b), max(a, b)): 2, (min(b, c), max(b, c)): 2}
+    assert all(other not in p for p in pairs)
 
 
 def test_load_derived_edges_is_idempotent_and_marks_source(mapped):
