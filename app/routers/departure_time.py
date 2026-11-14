@@ -1,21 +1,26 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_session
 from app.errors import CODE_VALIDATION_ERROR, AppError
-from app.schemas.departure_time import DepartureTimeRequest, DepartureTimeResponse
+from app.schemas.departure_time import DepartureTimeRequest, DepartureTimeResponse, SelectedTrainOut
 from app.schemas.elevators import ElevatorWarning
 from app.services.departure_time import parse_arrival_iso, recommend_departure, to_kst_dict
 from app.services.route_service import require_station
 from app.services.route_warning import build_elevator_warning, judge_stations_by_id, station_names
-from app.services.routing import find_route
+from app.services.routing import RoutePath, find_route
 from app.services.status_messages import (
     DEP_ELEVATOR_UNCONFIRMED,
+    DEP_TRAIN_NOT_FOUND,
+    DEP_TRAIN_TRANSFER_UNSUPPORTED,
     ROUTE_SAME_STATION,
     WARN_NO_ROUTE_STATIONS,
 )
-from app.timeutil import utc_now
+from app.services.train_selection import select_train, single_line_leg
+from app.timeutil import to_kst_iso, utc_now
 
 router = APIRouter(tags=["departure-time"])
 
@@ -28,10 +33,12 @@ _SEGMENT_FIELDS = (
 STATION_IDS_TOGETHER = "from_station_id와 to_station_id는 함께 주어야 합니다."
 
 
-def _elevator_warning(session: Session, body: DepartureTimeRequest, now) -> ElevatorWarning:
-    """역 id가 없으면 DB를 쓰지 않고 미확인으로 둔다. 둘 다 있으면 경로 위 모든 역을 판정한다."""
+def _elevator_warning(
+    session: Session, body: DepartureTimeRequest, now
+) -> tuple[ElevatorWarning, RoutePath | None]:
+    """역 id가 없으면 DB를 쓰지 않고 미확인으로 둔다. 둘 다 있으면 경로 위 모든 역을 판정한다. 찾은 경로도 돌려준다."""
     if body.from_station_id is None and body.to_station_id is None:
-        return ElevatorWarning(status="UNCONFIRMED", items=[], message=DEP_ELEVATOR_UNCONFIRMED)
+        return ElevatorWarning(status="UNCONFIRMED", items=[], message=DEP_ELEVATOR_UNCONFIRMED), None
     if body.from_station_id is None or body.to_station_id is None:
         raise AppError(422, CODE_VALIDATION_ERROR, STATION_IDS_TOGETHER)
     require_station(session, body.from_station_id)
@@ -47,7 +54,7 @@ def _elevator_warning(session: Session, body: DepartureTimeRequest, now) -> Elev
         transfer_minutes=settings.route_transfer_minutes,
     )
     if path is None:
-        return ElevatorWarning(status="UNCONFIRMED", items=[], message=WARN_NO_ROUTE_STATIONS)
+        return ElevatorWarning(status="UNCONFIRMED", items=[], message=WARN_NO_ROUTE_STATIONS), None
 
     station_ids: list[int] = []
     for node in path.nodes:
@@ -56,7 +63,24 @@ def _elevator_warning(session: Session, body: DepartureTimeRequest, now) -> Elev
     judgments = judge_stations_by_id(
         session, station_ids, now=now, ttl_minutes=settings.elevator_status_ttl_minutes
     )
-    return build_elevator_warning(judgments, station_ids, station_names(session, station_ids))
+    warning = build_elevator_warning(judgments, station_ids, station_names(session, station_ids))
+    return warning, path
+
+
+def _recommend(body: DepartureTimeRequest, now: datetime, segments: dict[str, int], **train_times: datetime) -> dict:
+    try:
+        rec = recommend_departure(
+            parse_arrival_iso(body.arrival_at),
+            travel_minutes=body.travel_minutes,
+            buffer_minutes=body.buffer_minutes,
+            now=now.replace(microsecond=0),  # 서비스는 초 단위 시각만 받는다
+            **train_times,
+            **segments,
+        )
+        return to_kst_dict(rec)  # KST 변환. 날짜 범위를 벗어나면 OverflowError
+    except (ValueError, OverflowError) as exc:
+        message = str(exc) if isinstance(exc, ValueError) else "시각이 표현 가능한 범위를 벗어났습니다."
+        raise AppError(422, CODE_VALIDATION_ERROR, message) from None
 
 
 @router.post("/api/departure-time", response_model=DepartureTimeResponse)
@@ -65,8 +89,10 @@ def calculate_departure_time(
 ) -> DepartureTimeResponse:
     """권장 출발 시각을 계산한다. 계산은 services.departure_time의 순수 함수를 그대로 쓴다.
 
-    결과를 저장하지 않는다. 실제 열차 시간표를 쓰지 않으므로 항상 estimated=true다.
-    from_station_id와 to_station_id를 함께 주면 경로 위 역의 엘리베이터 경고만 DB로 계산한다.
+    결과를 저장하지 않는다. 항상 estimated=true다.
+    from_station_id와 to_station_id를 함께 주면 경로 위 역의 엘리베이터 경고를 DB로 계산하고, 환승 없는 경로이고
+    시간표에 맞는 열차가 있으면 그 열차의 계획 시각으로 탑승·하차 시각을 맞춘다(selected_train, timetable_used=true).
+    그렇지 않으면 외부 입력 이동 시간으로 추정한다.
     """
     segments: dict[str, int] = {}
     defaults_applied: list[str] = []
@@ -80,21 +106,32 @@ def calculate_departure_time(
         segments[field] = value
 
     now = utc_now()
-    try:
-        rec = recommend_departure(
-            parse_arrival_iso(body.arrival_at),
-            travel_minutes=body.travel_minutes,
-            buffer_minutes=body.buffer_minutes,
-            now=now.replace(microsecond=0),  # 서비스는 초 단위 시각만 받는다
-            **segments,
-        )
-        data = to_kst_dict(rec)  # KST 변환. 날짜 범위를 벗어나면 OverflowError
-    except (ValueError, OverflowError) as exc:
-        message = str(exc) if isinstance(exc, ValueError) else "시각이 표현 가능한 범위를 벗어났습니다."
-        raise AppError(422, CODE_VALIDATION_ERROR, message) from None
+    data = _recommend(body, now, segments)
 
-    warning = _elevator_warning(session, body, now)
+    warning, path = _elevator_warning(session, body, now)
+
+    selected_train = None
+    train_note = None
+    if path is not None:
+        if single_line_leg(path) is None:
+            train_note = DEP_TRAIN_TRANSFER_UNSUPPORTED
+        else:
+            train = select_train(
+                session, path, parse_arrival_iso(body.arrival_at), exit_walk_minutes=segments["exit_walk_minutes"]
+            )
+            if train is None:
+                train_note = DEP_TRAIN_NOT_FOUND
+            else:
+                data = _recommend(body, now, segments, boarding_at=train.boarding_at, alighting_at=train.alighting_at)
+                selected_train = SelectedTrainOut(
+                    train_no=train.train_no,
+                    boarding_at=to_kst_iso(train.boarding_at),
+                    alighting_at=to_kst_iso(train.alighting_at),
+                )
+
     limitations = [*data["limitations"]]
+    if train_note is not None:
+        limitations.append(train_note)
     if warning.status != "CLEAR":
         limitations.append(warning.message)  # CLEAR는 제한 사항이 아니다
 
@@ -113,5 +150,6 @@ def calculate_departure_time(
         defaults_applied=defaults_applied,
         timeline=data["timeline"],
         elevator_warning=warning,
+        selected_train=selected_train,
         limitations=limitations,
     )

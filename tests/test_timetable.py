@@ -244,6 +244,31 @@ def test_duplicate_train_number_rolls_everything_back(mapped):
     assert mapped.scalar(select(func.max(TrainSchedule.fetched_at))) == "2026-11-14T03:00:00Z"  # 기존 데이터 유지
 
 
+def test_loop_terminal_rows_are_merged_into_one_row(mapped):
+    data = schedule()
+    data["0223"] = [
+        row("0223", "2022", "00:00:00", "05:30:00", origin="0223", dest="0223"),
+        row("0223", "2022", "06:58:00", "00:00:00", origin="0223", dest="0223"),
+    ]
+
+    report = load_timetables(mapped, fetch_timetables(FakeClient(data), ["0223"]), fetched_at="2026-11-14T03:00:00Z")
+
+    stored = mapped.scalars(select(TrainSchedule).where(TrainSchedule.train_no == "2022")).all()
+    assert len(stored) == 1 and report.counts["loop_terminal_merged"] == 1
+    assert stored[0].departure_time == 5 * 3600 + 30 * 60 and stored[0].arrival_time == 6 * 3600 + 58 * 60
+
+
+def test_duplicate_that_is_not_a_loop_terminal_pair_still_fails(mapped):
+    data = schedule()
+    data["0223"] = [
+        row("0223", "2022", "00:00:00", "05:30:00", origin="0223", dest="0223"),
+        row("0223", "2022", "00:00:00", "07:30:00", origin="0223", dest="0223"),
+    ]
+
+    with pytest.raises(TimetableError, match="중복"):
+        load_timetables(mapped, fetch_timetables(FakeClient(data), ["0223"]), fetched_at="2026-11-14T03:00:00Z")
+
+
 def test_failed_fetch_raises_before_any_write(mapped):
     with pytest.raises(SeoulOpenApiTransportError):
         fetch_timetables(FakeClient(fail_on="0223"), station_codes_in_db(mapped))
@@ -375,6 +400,47 @@ def test_load_derived_edges_dry_run_rolls_back(mapped):
 
     assert report.counts["adjacent_created"] == 2
     assert mapped.scalar(select(func.count()).select_from(StationEdge)) == 0
+
+
+def add_stops(db, train, stops, day="WEEKDAY"):
+    for sl, when in stops:
+        db.add(TrainSchedule(station_line_id=sl, service_day_type=day, direction=1, train_no=train,
+                             arrival_time=when, departure_time=when, is_express=False, fetched_at="2026-11-14T03:00:00Z"))
+
+
+def add_normal_and_nonstop_trains(db):
+    a, b, c = sl_id(db, 3), sl_id(db, 5), sl_id(db, 6)
+    for i in range(12):
+        base = 6 * 3600 + i * 600
+        add_stops(db, f"N{i}", [(a, base), (b, base + 120), (c, base + 270)])
+    for i in range(2):  # 급행 표시 없는 무정차 열차(회송·입출고로 추정)
+        base = 22 * 3600 + i * 600
+        add_stops(db, f"S{i}", [(a, base), (c, base + 270)])
+    db.commit()
+    return a, b, c
+
+
+def test_derive_drops_pairs_only_nonstop_trains_support(mapped):
+    a, b, c = add_normal_and_nonstop_trains(mapped)
+
+    pairs, stats = derive_adjacent_pairs(mapped)
+
+    assert set(pairs) == {(min(a, b), max(a, b)), (min(b, c), max(b, c))}
+    assert (min(a, c), max(a, c)) not in pairs and stats["pairs_below_relative_support"] == 1
+
+
+def test_prune_removes_stale_derived_edges_only(mapped):
+    a, b, c = add_normal_and_nonstop_trains(mapped)
+    mapped.add(StationEdge(from_station_line_id=min(a, c), to_station_line_id=max(a, c), edge_type="ADJACENT", source=SOURCE_TIMETABLE))
+    mapped.add(StationEdge(from_station_line_id=sl_id(mapped, 5, "3"), to_station_line_id=b, edge_type="TRANSFER", source="OA-13290"))
+    mapped.commit()
+
+    report = load_derived_edges(mapped, prune=True)
+
+    kept = {(t, s) for *_, t, s in edges(mapped)}
+    assert report.counts["adjacent_pruned"] == 1 and ("TRANSFER", "OA-13290") in kept
+    assert (min(a, c), max(a, c), "ADJACENT", SOURCE_TIMETABLE) not in edges(mapped)
+    assert load_derived_edges(mapped).counts["adjacent_pruned"] == 0
 
 
 def test_derived_edges_feed_the_route_api(client, mapped):

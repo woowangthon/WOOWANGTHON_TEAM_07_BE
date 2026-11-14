@@ -8,7 +8,7 @@
 """
 
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from sqlalchemy import delete, select
@@ -78,6 +78,46 @@ def parse_stop_rows(rows: list[dict[str, Any]], station_code: str) -> list[StopR
     return parsed
 
 
+def merge_loop_terminal_rows(stops: list[StopRow]) -> tuple[list[StopRow], int]:
+    """순환선 시발=종착역은 같은 열차가 출발 전용 행과 도착 전용 행으로 두 번 나온다. 한 행으로 합친다.
+
+    합칠 수 있는 것은 같은 train_no에서 한쪽은 출발만, 다른 쪽은 도착만 있고 나머지 필드가 같은 두 행뿐이다.
+    그 외 중복은 그대로 둬서 호출자가 오류로 처리한다. 합친 행은 시발 출발과 종착 도착을 함께 가진다.
+    """
+    result: list[StopRow] = []
+    index_by_train: dict[str, int] = {}
+    merged = 0
+    for stop in stops:
+        prev_index = index_by_train.get(stop.train_no)
+        if prev_index is None:
+            index_by_train[stop.train_no] = len(result)
+            result.append(stop)
+            continue
+        prev = result[prev_index]
+        departure_only_then_arrival_only = (
+            prev.arrival_time is None and prev.departure_time is not None
+            and stop.departure_time is None and stop.arrival_time is not None
+        )
+        arrival_only_then_departure_only = (
+            prev.departure_time is None and prev.arrival_time is not None
+            and stop.arrival_time is None and stop.departure_time is not None
+        )
+        same_trip = (
+            prev.origin_station_code == stop.origin_station_code
+            and prev.destination_station_code == stop.destination_station_code
+            and prev.is_express == stop.is_express
+            and prev.line_id == stop.line_id
+        )
+        if same_trip and (departure_only_then_arrival_only or arrival_only_then_departure_only):
+            arrival = prev.arrival_time if prev.arrival_time is not None else stop.arrival_time
+            departure = prev.departure_time if prev.departure_time is not None else stop.departure_time
+            result[prev_index] = replace(prev, arrival_time=arrival, departure_time=departure)
+            merged += 1
+        else:
+            result.append(stop)
+    return result, merged
+
+
 # (역 코드, 요일 종류, 방향) -> 정차 행
 Collected = dict[tuple[str, str, int], list[StopRow]]
 
@@ -144,11 +184,16 @@ def load_timetables(
                     TrainSchedule.direction == direction,
                 )
             )
-            seen: set[str] = set()
+            kept: list[StopRow] = []
             for stop in stops:
                 if stop.line_id is not None and stop.line_id != line_id:
                     report.counts["line_mismatch_skipped"] += 1
                     continue
+                kept.append(stop)
+            merged, merged_count = merge_loop_terminal_rows(kept)
+            report.counts["loop_terminal_merged"] += merged_count
+            seen: set[str] = set()
+            for stop in merged:
                 if stop.train_no in seen:
                     raise TimetableError(
                         f"같은 열차 번호가 중복되었습니다: {code} {day_type} {direction} {stop.train_no}"

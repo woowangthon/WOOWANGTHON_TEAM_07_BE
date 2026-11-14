@@ -5,7 +5,7 @@
 
 - 먼저 collect_timetable --apply로 train_schedules를 채워야 한다.
 - 환승 간선은 load_edges(공식 OA-13290 근거)가 맡는다. 이 명령은 ADJACENT만 만든다.
-- 기존 간선은 지우거나 덮어쓰지 않는다. 같은 입력을 다시 넣어도 늘지 않는다.
+- 기존 간선은 지우거나 덮어쓰지 않는다(--prune을 주면 이번 추출에 없는 OA-101 간선만 지운다). 같은 입력을 다시 넣어도 늘지 않는다.
 
 종료 코드: 0 정상, 1 적재 오류(롤백), 2 실행 준비 오류(DB 미준비, 시간표 없음)
 """
@@ -32,6 +32,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="시간표에서 인접역 간선을 뽑아 적재한다. 기본은 dry-run이다.")
     parser.add_argument("--database-url", default=None, help="기본값은 설정(DATABASE_URL)의 DB다.")
     parser.add_argument("--min-trains", type=int, default=MIN_TRAINS, help="간선으로 인정할 최소 열차 수.")
+    parser.add_argument("--prune", action="store_true", help="이번 추출에 없는 기존 OA-101 간선을 지운다.")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--dry-run", action="store_true", help="적용해 본 뒤 롤백한다(기본).")
     mode.add_argument("--apply", action="store_true", help="실제로 반영한다.")
@@ -58,7 +59,7 @@ def main(argv: list[str] | None = None) -> int:
                 print("오류: train_schedules가 비어 있습니다. collect_timetable --apply를 먼저 실행하세요.", file=sys.stderr)
                 return EXIT_NOT_READY
             try:
-                report = load_derived_edges(session, dry_run=not args.apply, min_trains=args.min_trains)
+                report = load_derived_edges(session, dry_run=not args.apply, min_trains=args.min_trains, prune=args.prune)
             except Exception as exc:  # 롤백은 서비스가 했다
                 print(f"오류: 간선 적재에 실패했습니다({type(exc).__name__}). 전체 변경을 롤백했습니다.", file=sys.stderr)
                 return EXIT_ERROR
