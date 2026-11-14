@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.errors import CODE_NOT_FOUND, AppError
+from app.services.status_messages import GLOBAL_SOME_UNKNOWN
 from app.models import Elevator, ElevatorStatus, Station
 from app.schemas.elevators import (
     ElevatorItem,
@@ -120,11 +121,20 @@ def list_elevator_statuses(
         return ElevatorStatusListResponse(elevators=[], count=0, limitations=[])
 
     info = {e.elevator_id: (e, name) for e, name, _ in rows}
-    judgments = [
+    all_judgments = [
         j for station in _judge(rows, now=now, ttl_minutes=ttl_minutes) for j in station.elevators
     ]
+
+    # 미확인(NO_DATA, STALE) 설비 수를 필터 적용 전 전체 판정 결과에서 센다.
+    # 필터가 미확인 설비를 결과에서 제외하더라도 시스템에 존재하는 미확인은 그대로이므로
+    # 필터 여부와 무관하게 limitations에 명시한다(계약 5.3절).
+    unknown_count = sum(1 for j in all_judgments if j.unknown_reason is not None)
+    limitations = [GLOBAL_SOME_UNKNOWN] if unknown_count > 0 else []
+
     if status is not None:
-        judgments = [j for j in judgments if j.status == status]
+        judgments = [j for j in all_judgments if j.status == status]
+    else:
+        judgments = all_judgments
 
     items = []
     for j in judgments:
@@ -142,5 +152,4 @@ def list_elevator_statuses(
                 fetched_at=_to_kst(j.fetched_at),
             )
         )
-    # limitations: 설비 단위 표준 문구가 계약에 없어 빈 배열이다(남은 문제 참고).
-    return ElevatorStatusListResponse(elevators=items, count=len(items), limitations=[])
+    return ElevatorStatusListResponse(elevators=items, count=len(items), limitations=limitations)
