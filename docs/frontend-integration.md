@@ -8,10 +8,14 @@
 - 시각: 응답은 KST ISO 8601(`+09:00`). 요청의 시각은 오프셋이 있어야 한다.
 - 모든 업무 응답에 `limitations`(사용자에게 그대로 보여 줄 한국어 문장 배열)가 있다. **비어 있지 않으면 화면에 표시한다.**
 - 오류 형식: `{"error": {"code": "NOT_FOUND|VALIDATION_ERROR|METHOD_NOT_ALLOWED|INTERNAL_ERROR", "message": "..."}}`. 없는 리소스 404, 입력 오류 422.
-- CORS: 서버의 `CORS_ALLOWED_ORIGINS`에 FE Origin이 있어야 한다. 기본은 비어 있어 브라우저 호출이 막힌다. 허용 메서드는 GET, POST, OPTIONS, 헤더는 Content-Type, 쿠키·인증은 쓰지 않는다.
+- CORS: 서버의 `CORS_ALLOWED_ORIGINS`에 FE Origin이 있어야 한다. 기본은 비어 있어 브라우저 호출이 막힌다. 명시된 Origin에 쿠키를 허용하며 GET, POST, PATCH, DELETE, OPTIONS와 Content-Type, X-CSRF-Token 헤더를 지원한다. 계정 API의 변경 요청은 Origin·CSRF 토큰을 추가 검증한다.
 - 상태 값이 `null`이면 "정상"으로 표시하지 않는다. 확인하지 못했다는 뜻이다.
 
 ## API 목록
+
+계정 API는 [계정 API 계약](api-contract.md#계정-api-추가-2026-11-15)을 따른다. `GET /api/auth/me`로 로그인 상태·csrf_token을 읽고 개인 요청은 `credentials: 'include'`로 보낸다. 변경 요청은 `X-CSRF-Token`도 보낸다. 401이면 개인 캐시를 비우고 로그인 상태를 해제한다. OAuth는 fetch 대신 `GET /api/auth/{provider}/login`으로 브라우저를 이동한다. 사용자 표시 이름은 `name`, 수정 요청은 `display_name`이다. 실제 서버 저장 즐겨찾기는 `/api/me/favorites`이며 FE slug와 정수 station_id는 StationIdMap으로 변환한다.
+
+FE `npm.cmd run dev:auth`가 실제 인증 모드를 선택한다. 제공자 키와 Redirect URI 설정은 [BE README](../README.md#google카카오-로그인-준비)에 있다. AI `/api/chat` 요청에는 계정 토큰·이메일을 추가하지 않는다.
 
 | Method | Path | 용도 | 비고 |
 |---|---|---|---|

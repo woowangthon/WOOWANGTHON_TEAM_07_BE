@@ -16,6 +16,7 @@ EXPECTED_TABLES = {
     "station_edges",
     "elevators",
     "elevator_status",
+    "users", "auth_identities", "auth_sessions", "oauth_flows", "user_favorites",
 }
 
 

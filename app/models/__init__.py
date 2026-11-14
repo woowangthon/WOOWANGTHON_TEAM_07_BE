@@ -8,8 +8,10 @@ from app.models.station_external_ids import StationExternalId
 from app.models.station_lines import StationLine
 from app.models.stations import Station
 from app.models.train_schedules import TrainSchedule
+from app.models.accounts import AuthIdentity, AuthSession, OAuthFlow, User, UserFavorite
 
 __all__ = [
+    "User", "AuthIdentity", "AuthSession", "OAuthFlow", "UserFavorite",
     "Line",
     "Station",
     "StationLine",

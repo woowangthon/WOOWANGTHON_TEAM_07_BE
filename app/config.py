@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.departure_defaults import (
@@ -32,6 +32,16 @@ class Settings(BaseSettings):
 
     # 환경 변수 CORS_ALLOWED_ORIGINS(쉼표 구분, 예: http://localhost:5173). 기본은 빈 값이며 교차 출처를 허용하지 않는다.
     cors_allowed_origins: str = ""
+
+    # OAuth 비밀은 서버에서만 사용하며 Settings 출력에서도 가린다.
+    google_client_id: str = ""
+    google_client_secret: SecretStr = SecretStr("")
+    kakao_client_id: str = ""
+    kakao_client_secret: SecretStr = SecretStr("")
+    auth_public_base_url: str = "http://127.0.0.1:8000"
+    auth_frontend_url: str = "http://127.0.0.1:5173/#/main"
+    auth_cookie_secure: bool = False  # HTTP는 루프백 개발 환경에서만 허용
+    auth_session_days: int = Field(default=7, ge=1, le=30)
 
     # 경로 탐색 가중치(분). 환경 변수 ROUTE_SEGMENT_MINUTES, ROUTE_TRANSFER_MINUTES. 검증되지 않은 추정값이다.
     route_segment_minutes: int = Field(default=2, ge=1, le=30)

@@ -9,6 +9,30 @@
 
 ## 0. 공통 규칙
 
+### 계정 API 추가 (2026-11-15)
+
+Google·카카오 OAuth와 서버 저장 즐겨찾기를 추가했다. 기존 역·경로·AI 응답 계약은 유지한다. 인증 라우터는 제공자의 인가 코드를 서버에서 토큰으로 교환하고 사용자 정보 API를 조회하는 예외이며, 공공데이터 수집은 기존 CLI 방식이다. 실제 제공자 키를 사용한 검증은 키 발급 후 수행해야 한다.
+
+| 메서드·경로 | 요청/응답 |
+|---|---|
+| `GET /api/auth/{google\|kakao}/login` | OAuth 화면으로 302. 키 미설정 503 `AUTH_NOT_CONFIGURED`, 미지원 제공자 404 |
+| `GET /api/auth/{google\|kakao}/callback` | 일회용 state와 브라우저 쿠키 검증, Google PKCE. 성공 시 세션 쿠키와 설정된 FE 주소로 303 |
+| `GET /api/auth/me` | `{ id, name, provider, csrf_token, limitations: [] }`, 미로그인/만료 401 |
+| `PATCH /api/auth/profile` | `{ display_name: string(1..30) }` → 최신 me 응답 |
+| `POST /api/auth/logout` | 현재 세션 삭제·쿠키 삭제, 204. 사용자·즐겨찾기는 보존 |
+| `GET /api/me/favorites` | `{ items: [{ id, place_name, station_id: int\|null, alias: string\|null }], limitations: [] }` |
+| `POST /api/me/favorites` | `{ place_name: string(1..64), station_id?: int\|null, alias?: string(0..20)\|null }` → 생성 항목과 limitations, 201 |
+| `PATCH /api/me/favorites/{id}` | `{ alias?: string(0..20)\|null }` → 수정 항목과 limitations. null/생략은 별칭 제거 |
+| `DELETE /api/me/favorites/{id}` | 삭제, 204 |
+
+- 새 계정 테이블: `users`, `auth_identities`(provider+subject UNIQUE), `auth_sessions`(세션 해시·CSRF·만료), `oauth_flows`(일회용 state 해시·브라우저 해시·verifier·10분 만료), `user_favorites`(사용자 FK, 선택적 `stations.station_id` FK). 마이그레이션 `d96e20b4a701`. 기존 테이블/데이터는 변경하지 않는다.
+- 세션 원본은 HttpOnly·SameSite=Lax·Path=/ 쿠키 `woowang_session`에만 발급한다. DB에는 SHA-256 해시만 저장한다. 기본 만료 7일, 로그인 때 기존 브라우저 세션을 폐기한다. Google과 카카오는 이메일 기준으로 자동 병합하지 않는다. 제공자 토큰·이메일은 저장하지 않는다.
+- 변경 요청은 `credentials: include`, 명시적으로 허용된 `Origin`, `/auth/me`에서 받은 `X-CSRF-Token`이 필요하다. 누락/불일치는 403 `CSRF_FAILED`. 사용자 ID를 본문으로 받지 않는다. 다른 사용자 항목은 수정/삭제 404다.
+- station_id가 있으면 서버 역명으로 place_name을 정규화한다. 없는 역 404, 같은 사용자의 중복 역 409 `DUPLICATE_FAVORITE`. station_id가 null인 일반 장소는 유지하고 주변 역을 추측하지 않는다.
+- 계정 응답과 오류는 `Cache-Control: no-store`, `Referrer-Policy: no-referrer`. 콜백 실패는 FE 쿼리 `auth_error=invalid_state|cancelled|provider_failed`로 전달하며 제공자 원문 오류·키·코드는 전달하지 않는다. 204는 본문이 없다.
+- 만료 flow/세션은 새 로그인 시작 때 정리한다. 세션은 요청 때도 만료를 검사한다. OAuth 제공자 HTTP 호출은 10초 timeout, HTTPS 고정 URL, 리다이렉트 미추적이다.
+- 설정·실행·콜백 등록은 [README 로그인 준비](../README.md#google카카오-로그인-준비). HTTPS 배포에서 `AUTH_COOKIE_SECURE=true`가 필요하며, FE/BE는 쿠키를 쓸 수 있는 같은 사이트로 배치한다.
+
 ### 0.1 경로
 - 모든 업무 API는 `/api` 아래에 둔다. 헬스 체크 `GET /health`는 예외다.
 - 필드 이름은 `snake_case`를 쓴다.
