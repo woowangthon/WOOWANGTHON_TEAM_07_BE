@@ -58,6 +58,20 @@ uv run python -m app.cli.load_seed --dry-run   # 적용해 본 뒤 롤백. DB는
 uv run python -m app.cli.load_seed             # 멱등 적재. 충돌하면 전체 롤백
 ```
 
+## 역 간선 적재 (공식 근거로 검증된 간선만)
+
+```bash
+# 기본은 dry-run: 적용해 본 뒤 롤백한다. 역 시드(load_seed)가 먼저 적재되어 있어야 한다
+uv run python -m app.cli.load_edges
+# 실제 반영은 --apply를 명시했을 때만 한다
+uv run python -m app.cli.load_edges --apply
+```
+
+- `data/seed/station_edges_verified.csv`(VERIFIED: OA-13290 환승 간선 38개)만 읽는다.
+- 인접 간선 239개는 공식 인접 증명이 없어 **PROVISIONAL**이며(`station_edges_provisional.csv`) 이 명령으로 적재되지 않는다. 적재 옵션도 없다. 검토 목록(`station_edges_review.csv`)도 적재하지 않는다.
+- 공식 근거 없는 간선이 입력에 섞이면 DB에 손대기 전에 거부한다. 매핑 실패나 충돌은 전체 롤백, 재실행해도 중복되지 않고 기존 간선은 삭제·덮어쓰지 않는다.
+- 등급과 한계는 `data/seed/SOURCES.md`의 "역 간선"을 본다. 간선 수는 실제 거리나 무장애 이동 가능성이 아니다.
+
 ## 엘리베이터 수집 CLI (OA-15994)
 
 서울 열린데이터광장 OA-15994 응답에서 엘리베이터(EV)만 골라 `elevators`, `elevator_status`에 Upsert한다.

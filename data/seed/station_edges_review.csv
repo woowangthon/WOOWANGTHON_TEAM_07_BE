@@ -1,0 +1,157 @@
+review_type,line,ref,status,reason
+MAPPING_FAILED,1,changdong(창동),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,1,daebang(대방),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,1,doksan(독산),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,1,gaebong(개봉),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,1,gasan_digital(가산디지털단지),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,1,guil(구일),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,1,guro(구로),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,1,hoegi(회기),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,1,hufs(외대앞),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,1,kwangwoon_univ(광운대),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,1,namyeong(남영),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,1,nokcheon(녹천),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,1,noryangjin(노량진),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,1,onsu(온수),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,1,oryu_dong(오류동),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,1,seokgye(석계),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,1,sindorim(신도림),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,1,singil(신길),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,1,sinimun(신이문),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,1,wolgye(월계),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,1,yeongdeungpo(영등포),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,1,yongsan(용산),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,2,kkachisan(까치산),PENDING,NOT_IN_BACKEND_SEED
+MAPPING_FAILED,7,ttukseom_park(뚝섬유원지),PENDING,NOT_IN_BACKEND_SEED
+NAME_VARIANT,1,cheongnyangni(청량리),ACCEPTED_BY_LINE_AND_CODE,백엔드 0158 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,1,seoul(서울역),ACCEPTED_BY_LINE_AND_CODE,백엔드 0150 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,2,chungjeongno(충정로),ACCEPTED_BY_LINE_AND_CODE,백엔드 0243 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,2,daerim(대림),ACCEPTED_BY_LINE_AND_CODE,백엔드 0233 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,2,ddp(동대문역사문화공원),ACCEPTED_BY_LINE_AND_CODE,백엔드 0205 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,2,gangbyeon(강변),ACCEPTED_BY_LINE_AND_CODE,백엔드 0214 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,2,guui(구의),ACCEPTED_BY_LINE_AND_CODE,백엔드 0213 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,2,gyodae(교대),ACCEPTED_BY_LINE_AND_CODE,백엔드 0223 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,2,jamsil(잠실),ACCEPTED_BY_LINE_AND_CODE,백엔드 0216 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,2,nakseongdae(낙성대),ACCEPTED_BY_LINE_AND_CODE,백엔드 0227 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,2,samseong(삼성),ACCEPTED_BY_LINE_AND_CODE,백엔드 0219 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,2,seoul_univ(서울대입구),ACCEPTED_BY_LINE_AND_CODE,백엔드 0228 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,2,sinchon(신촌),ACCEPTED_BY_LINE_AND_CODE,백엔드 0240 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,2,wangsimni(왕십리),ACCEPTED_BY_LINE_AND_CODE,백엔드 0208 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,2,yongdu(용두),ACCEPTED_BY_LINE_AND_CODE,백엔드 0250 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,3,gyeongbokgung(경복궁),ACCEPTED_BY_LINE_AND_CODE,백엔드 0317 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,3,gyodae(교대),ACCEPTED_BY_LINE_AND_CODE,백엔드 0330 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,3,nambu_terminal(남부터미널),ACCEPTED_BY_LINE_AND_CODE,백엔드 0331 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,3,yangjae(양재),ACCEPTED_BY_LINE_AND_CODE,백엔드 0332 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,4,ddp(동대문역사문화공원),ACCEPTED_BY_LINE_AND_CODE,백엔드 0422 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,4,dongjak(동작),ACCEPTED_BY_LINE_AND_CODE,백엔드 0431 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,4,hansung(한성대입구),ACCEPTED_BY_LINE_AND_CODE,백엔드 0419 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,4,hoehyeon(회현),ACCEPTED_BY_LINE_AND_CODE,백엔드 0425 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,4,ichon(이촌),ACCEPTED_BY_LINE_AND_CODE,백엔드 0430 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,4,mia(미아),ACCEPTED_BY_LINE_AND_CODE,백엔드 0415 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,4,samgakji(삼각지),ACCEPTED_BY_LINE_AND_CODE,백엔드 0428 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,4,seoul(서울역),ACCEPTED_BY_LINE_AND_CODE,백엔드 0426 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,4,sookmyung(숙대입구),ACCEPTED_BY_LINE_AND_CODE,백엔드 0427 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,4,sungshin(성신여대입구),ACCEPTED_BY_LINE_AND_CODE,백엔드 0418 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,4,suyu(수유),ACCEPTED_BY_LINE_AND_CODE,백엔드 0414 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,5,achasan(아차산),ACCEPTED_BY_LINE_AND_CODE,백엔드 2546 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,5,cheonho(천호),ACCEPTED_BY_LINE_AND_CODE,백엔드 2548 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,5,chungjeongno(충정로),ACCEPTED_BY_LINE_AND_CODE,백엔드 2532 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,5,ddp(동대문역사문화공원),ACCEPTED_BY_LINE_AND_CODE,백엔드 2537 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,5,gubeundari(굽은다리),ACCEPTED_BY_LINE_AND_CODE,백엔드 2551 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,5,gunja(군자),ACCEPTED_BY_LINE_AND_CODE,백엔드 2545 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,5,gwanghwamun(광화문),ACCEPTED_BY_LINE_AND_CODE,백엔드 2534 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,5,gwangnaru(광나루),ACCEPTED_BY_LINE_AND_CODE,백엔드 2547 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,5,jongno3ga(종로3가),ACCEPTED_BY_LINE_AND_CODE,백엔드 2535 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,5,olympic_park(올림픽공원),ACCEPTED_BY_LINE_AND_CODE,백엔드 2556 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,5,omokgyo(오목교),ACCEPTED_BY_LINE_AND_CODE,백엔드 2522 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,5,sinjeong(신정),ACCEPTED_BY_LINE_AND_CODE,백엔드 2520 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,5,wangsimni(왕십리),ACCEPTED_BY_LINE_AND_CODE,백엔드 2541 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,6,anam(안암),ACCEPTED_BY_LINE_AND_CODE,백엔드 2640 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,6,bonghwasan(봉화산),ACCEPTED_BY_LINE_AND_CODE,백엔드 2648 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,6,daeheung(대흥),ACCEPTED_BY_LINE_AND_CODE,백엔드 2626 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,6,gwangheungchang(광흥창),ACCEPTED_BY_LINE_AND_CODE,백엔드 2625 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,6,hwarangdae(화랑대),ACCEPTED_BY_LINE_AND_CODE,백엔드 2647 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,6,jeungsan(증산),ACCEPTED_BY_LINE_AND_CODE,백엔드 2618 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,6,korea_univ(고려대),ACCEPTED_BY_LINE_AND_CODE,백엔드 2641 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,6,noksapyeong(녹사평),ACCEPTED_BY_LINE_AND_CODE,백엔드 2630 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,6,saejeol(새절),ACCEPTED_BY_LINE_AND_CODE,백엔드 2617 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,6,sangwolgok(상월곡),ACCEPTED_BY_LINE_AND_CODE,백엔드 2643 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,6,wolgok(월곡),ACCEPTED_BY_LINE_AND_CODE,백엔드 2642 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,6,worldcup_stadium(월드컵경기장),ACCEPTED_BY_LINE_AND_CODE,백엔드 2620 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,7,children_park(어린이대공원),ACCEPTED_BY_LINE_AND_CODE,백엔드 2728 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,7,daerim(대림),ACCEPTED_BY_LINE_AND_CODE,백엔드 2746 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,7,gongneung(공릉),ACCEPTED_BY_LINE_AND_CODE,백엔드 2718 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,7,gunja(군자),ACCEPTED_BY_LINE_AND_CODE,백엔드 2727 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,7,isu(총신대입구(이수)),ACCEPTED_BY_LINE_AND_CODE,백엔드 2738 와 confirmed_group 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,7,onsu(온수),ACCEPTED_BY_LINE_AND_CODE,백엔드 2752 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,7,soongsil(숭실대입구),ACCEPTED_BY_LINE_AND_CODE,백엔드 2740 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,7,yongmasan(용마산),ACCEPTED_BY_LINE_AND_CODE,백엔드 2725 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,8,cheonho(천호),ACCEPTED_BY_LINE_AND_CODE,백엔드 2812 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,8,jamsil(잠실),ACCEPTED_BY_LINE_AND_CODE,백엔드 2815 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,8,mongchontoseong(몽촌토성),ACCEPTED_BY_LINE_AND_CODE,백엔드 2814 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+NAME_VARIANT,8,namhansanseong(남한산성입구),ACCEPTED_BY_LINE_AND_CODE,백엔드 2823 와 normalized 일치. 간선은 역번호 연속성으로 따로 검증
+ADJACENT_PENDING,1,changdong>nokcheon,PENDING,"MAIN: 매핑 실패(changdong,nokcheon)"
+ADJACENT_PENDING,1,nokcheon>wolgye,PENDING,"MAIN: 매핑 실패(nokcheon,wolgye)"
+ADJACENT_PENDING,1,wolgye>kwangwoon_univ,PENDING,"MAIN: 매핑 실패(wolgye,kwangwoon_univ)"
+ADJACENT_PENDING,1,kwangwoon_univ>seokgye,PENDING,"MAIN: 매핑 실패(kwangwoon_univ,seokgye)"
+ADJACENT_PENDING,1,seokgye>sinimun,PENDING,"MAIN: 매핑 실패(seokgye,sinimun)"
+ADJACENT_PENDING,1,sinimun>hufs,PENDING,"MAIN: 매핑 실패(sinimun,hufs)"
+ADJACENT_PENDING,1,hufs>hoegi,PENDING,"MAIN: 매핑 실패(hufs,hoegi)"
+ADJACENT_PENDING,1,hoegi>cheongnyangni,PENDING,MAIN: 매핑 실패(hoegi)
+ADJACENT_PENDING,1,sinseoldong>dongmyo,PENDING,MAIN: 공식 역번호가 연속하지 않음(0156→0159). 프론트 순서를 공식 근거로 확인하지 못함
+ADJACENT_PENDING,1,dongmyo>dongdaemun,PENDING,MAIN: 공식 역번호가 연속하지 않음(0159→0155). 프론트 순서를 공식 근거로 확인하지 못함
+ADJACENT_PENDING,1,seoul>namyeong,PENDING,MAIN: 매핑 실패(namyeong)
+ADJACENT_PENDING,1,namyeong>yongsan,PENDING,"MAIN: 매핑 실패(namyeong,yongsan)"
+ADJACENT_PENDING,1,yongsan>noryangjin,PENDING,"MAIN: 매핑 실패(yongsan,noryangjin)"
+ADJACENT_PENDING,1,noryangjin>daebang,PENDING,"MAIN: 매핑 실패(noryangjin,daebang)"
+ADJACENT_PENDING,1,daebang>singil,PENDING,"MAIN: 매핑 실패(daebang,singil)"
+ADJACENT_PENDING,1,singil>yeongdeungpo,PENDING,"MAIN: 매핑 실패(singil,yeongdeungpo)"
+ADJACENT_PENDING,1,yeongdeungpo>sindorim,PENDING,"MAIN: 매핑 실패(yeongdeungpo,sindorim)"
+ADJACENT_PENDING,1,sindorim>guro,PENDING,"MAIN: 매핑 실패(sindorim,guro)"
+ADJACENT_PENDING,1,guro>gasan_digital,PENDING,"MAIN: 매핑 실패(guro,gasan_digital)"
+ADJACENT_PENDING,1,gasan_digital>doksan,PENDING,"MAIN: 매핑 실패(gasan_digital,doksan)"
+ADJACENT_PENDING,1,guro>guil,PENDING,"BRANCH1: 매핑 실패(guro,guil)"
+ADJACENT_PENDING,1,guil>gaebong,PENDING,"BRANCH1: 매핑 실패(guil,gaebong)"
+ADJACENT_PENDING,1,gaebong>oryu_dong,PENDING,"BRANCH1: 매핑 실패(gaebong,oryu_dong)"
+ADJACENT_PENDING,1,oryu_dong>onsu,PENDING,"BRANCH1: 매핑 실패(oryu_dong,onsu)"
+ADJACENT_PENDING,2,chungjeongno>cityhall,PENDING,MAIN: 순환 연결. 공식 근거 없음(프론트 loop 플래그뿐)
+ADJACENT_PENDING,2,seongsu>yongdap,PENDING,BRANCH1: 공식 역번호가 연속하지 않음(0211→0244). 프론트 순서를 공식 근거로 확인하지 못함
+ADJACENT_PENDING,2,sindap>yongdu,PENDING,BRANCH1: 공식 역번호가 연속하지 않음(0245→0250). 프론트 순서를 공식 근거로 확인하지 못함
+ADJACENT_PENDING,2,yongdu>sinseoldong,PENDING,BRANCH1: 공식 역번호가 연속하지 않음(0250→0246). 프론트 순서를 공식 근거로 확인하지 못함
+ADJACENT_PENDING,2,sindorim>dorimcheon,PENDING,BRANCH2: 공식 역번호가 연속하지 않음(0234→0247). 프론트 순서를 공식 근거로 확인하지 못함
+ADJACENT_PENDING,2,sinjeongnegeori>kkachisan,PENDING,BRANCH2: 매핑 실패(kkachisan)
+ADJACENT_PENDING,3,garak_market>ogeum,PENDING,MAIN: 공식 역번호가 연속하지 않음(0340→0342). 프론트 순서를 공식 근거로 확인하지 못함
+ADJACENT_PENDING,5,gangdong>dunchon_dong,PENDING,BRANCH1: 공식 역번호가 연속하지 않음(2549→2555). 프론트 순서를 공식 근거로 확인하지 못함
+ADJACENT_PENDING,6,gusan>eungam,PENDING,MAIN: 공식 역번호가 연속하지 않음(2616→2611). 프론트 순서를 공식 근거로 확인하지 못함
+ADJACENT_PENDING,6,eungam>saejeol,PENDING,MAIN: 공식 역번호가 연속하지 않음(2611→2617). 프론트 순서를 공식 근거로 확인하지 못함
+ADJACENT_PENDING,7,konkuk>ttukseom_park,PENDING,MAIN: 매핑 실패(ttukseom_park)
+ADJACENT_PENDING,7,ttukseom_park>cheongdam,PENDING,MAIN: 매핑 실패(ttukseom_park)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,1,0155-0156,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,1,0158-0159,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,2,0243-0244,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,2,0245-0246,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,2,0246-0247,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,2,0249-0250,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,3,0309-0310,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,3,0340-0341,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,3,0341-0342,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,4,0409-0410,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,4,0410-0411,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,5,2511-2512,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,5,2512-2513,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,5,2554-2555,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,5,2561-2562,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,5,2562-2563,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,5,2563-2564,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,5,2564-2565,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,5,2565-2566,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,6,2616-2617,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,6,2648-2649,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,7,2711-2712,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,7,2712-2713,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,7,2713-2714,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,7,2714-2715,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,7,2729-2730,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,7,2730-2731,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,8,2810-2811,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
+BACKEND_CODE_NEIGHBOR_WITHOUT_EDGE,8,2827-2828,PENDING,역번호는 연속하지만 검증된 간선이 없음(프론트 누락 또는 매핑 실패)
