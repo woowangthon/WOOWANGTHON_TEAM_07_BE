@@ -8,9 +8,10 @@ from sqlalchemy.orm import Session
 from app.errors import CODE_NOT_FOUND, AppError
 from app.models import Line, Station, StationLine
 from app.schemas.stations import LineRef, StationDetail, StationSearchResponse, StationSummary
+from app.services.status_messages import LINE_1_PARTIAL
 
 # docs/api-contract.md 0.4절 표준 문구 (D11). 문구를 바꾸면 계약 문서와 함께 바꾼다.
-LINE_1_LIMITATION = "1호선은 일부 구간의 역만 포함되어 있어 전체 구간을 포함하지 않음"
+LINE_1_LIMITATION = LINE_1_PARTIAL  # docs/api-contract.md 0.4절 표준 문구(D11)
 LINE_1 = "1"
 NOT_FOUND_MESSAGE = "요청한 리소스를 찾을 수 없습니다."
 
