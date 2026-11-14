@@ -18,7 +18,7 @@ Python 3.13, FastAPI, SQLite(SQLAlchemy + Alembic), 패키지 관리 `uv`.
 ## 2. 읽는 순서
 
 1. 이 문서
-2. [docs/api-contract.md](docs/api-contract.md) — API 응답 계약, 상태 판정 규칙(§6), 결정 사항 D1~D18, 미검증 항목(§9). **API를 만지기 전에 필독**
+2. [docs/api-contract.md](docs/api-contract.md) — API 응답 계약, 상태 판정 규칙(§6), 결정 사항 D1~D19, 미검증 항목(§9). **API를 만지기 전에 필독**
 3. [docs/frontend-integration.md](docs/frontend-integration.md) — FE/AI가 쓰는 API 요약
 4. [docs/demo-handoff.md](docs/demo-handoff.md), [docs/deployment-considerations.md](docs/deployment-considerations.md) — 시연과 배포 조건(배포 대상은 미정)
 5. [docs/api-notes.md](docs/api-notes.md) — 외부 API(OA-15994 등) 실제 응답 조사 기록
@@ -99,10 +99,9 @@ uv run python -m app.cli.derive_edges --help          # 시간표에서 인접 �
 ## 7. 아직 결정되지 않은 것 (임의로 정하지 말고 사용자에게 묻는다)
 
 - **갱신 주기·TTL**: 현재 120분은 임시값이다(D1). OA-15994 갱신 주기를 확인한 뒤 확정한다.
-- **역 전체 목록 API**: AI가 요청 중이다(BE #14 코멘트). `GET /api/stations`는 `q`가 필수라 전체 목록을 받을 수 없어, AI는 `GET /api/stations/{id}`를 ID 1부터 차례로 조회하는 우회를 쓴다(ID가 연속이라는 가정에 기댐). `q` 생략 허용이나 별도 목록 API를 검토한다. **5d2b26a 기준 `main`에는 아직 반영되지 않았다.**
 - **데이터 현황 (2026-11-14, `data/dev.db`, 사용자 승인 후 적재)**: 시드 역 240개·환승 간선 38개, 엘리베이터 866건 수집, 시간표(OA-101) 전체 수집 279,458행, 시간표에서 추출한 인접 간선 269개(`--prune` 후). 순환 종착 병합 1,142건. 합성 상태 5건이 남아 있는지는 (미검증). 시간표는 공휴일 데이터가 없어 평일·토·일만 구분한다. 시간표 수집 276개는 역-노선 쌍이고 시드 240개는 고유 역이라(환승역 34개가 36쌍을 줄임) 불일치가 아니다(#16, `docs/api-notes.md`).
 - **경로·간선의 신뢰도**: 경로의 인접 간선은 시간표(OA-101)에서 추출한 것이고 공식 인접역 자료가 아니며, 소요 시간은 역 간 2분·환승 5분 가정이다. 엘리베이터만으로 이동 가능한 환승·출입 동선인지도 검증되지 않았다. 시연에서 경로를 어떻게 표현할지 팀 확인이 필요하다.
-- 팀 결정이 끝난 것(참고): `buffer_minutes` 기본 5분(D15), 서울 열린데이터광장 평문 HTTP 허용(D14), 인접 간선을 시간표에서 추출(D16), 상태 목록의 `line` 필터(D18).
+- 팀 결정이 끝난 것(참고): `buffer_minutes` 기본 5분(D15), 서울 열린데이터광장 평문 HTTP 허용(D14), 인접 간선을 시간표에서 추출(D16), 상태 목록의 `line` 필터(D18), `q` 생략 시 역 전체 목록(D19, #73 — AI는 ID 1부터 순회하는 우회와 ID 연속 가정을 없앨 수 있다).
 - **시연 데이터와 Mock 금지**: 데모 DB의 `[DEMO/SYNTHETIC]` 상태 5건을 시연에서 써도 되는지, 쓸 수 없다면 **실제 엘리베이터 수집(#44)을 시연 전에 돌려야 한다**. 실제 수집은 OA-15994 HTTPS 주소 확인과 호출 한도 확인이 선행된다.
 - **배포 대상**(호스팅, HTTPS, SQLite 영속 디스크, 백업)과 실제 `data/dev.db` 적재 — 모두 별도 승인 사항이다(`docs/deployment-considerations.md` §5).
 - 계약 문서의 FE/AI 리뷰 확정(BE #14는 리뷰 전까지 Open), `observed_at`(원본에 시각이 없어 항상 `null`), 역 좌표 출처, 1호선 전체 구간 확보.
