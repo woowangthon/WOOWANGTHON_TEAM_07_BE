@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     elevator_status_ttl_minutes: int = Field(
         default=TTL_MINUTES_DEFAULT, ge=TTL_MINUTES_MIN, le=TTL_MINUTES_MAX
     )
+    # 환경 변수 ALTERNATIVE_SEARCH_DEPTH로 바꾼다. 대체역 BFS 탐색 깊이(간선 수). 1~10만 허용한다.
+    # 기본값 2는 임시 기본값이다(계약 미확정).
+    alternative_search_depth: int = Field(default=2, ge=1, le=10)
 
 
 settings = Settings()

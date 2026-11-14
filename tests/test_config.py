@@ -58,3 +58,17 @@ def test_ttl_bounds_match_the_judgment_module() -> None:
 
     assert (judge_min, judge_max) == (TTL_MINUTES_MIN, TTL_MINUTES_MAX) == (1, 1440)
     assert TTL_MINUTES_DEFAULT == 30
+
+
+def test_alternative_search_depth_default_and_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ALTERNATIVE_SEARCH_DEPTH", raising=False)
+    assert Settings(_env_file=None).alternative_search_depth == 2
+    monkeypatch.setenv("ALTERNATIVE_SEARCH_DEPTH", "4")
+    assert Settings(_env_file=None).alternative_search_depth == 4
+
+
+@pytest.mark.parametrize("value", ["0", "11", "abc"])
+def test_alternative_search_depth_rejects_out_of_range(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+    monkeypatch.setenv("ALTERNATIVE_SEARCH_DEPTH", value)
+    with pytest.raises(Exception):
+        Settings(_env_file=None)

@@ -482,6 +482,15 @@ Issue #8의 업무 엔드포인트 7개와 헬스 체크다.
 | `POST /api/departure-time` | #39 | `estimated`, `limitations` 포함. 계산 결과를 DB에 저장하지 않음 |
 | 실시간 도착 정보 | #40, #41 | 외부 실패 시 "미확인" 표시. 이전 캐시를 현재 정보처럼 보여 주지 않음 |
 
+### 8.1 대체역 `GET /api/stations/{station_id}/alternatives` (#33, 초안 — FE/AI 리뷰 전)
+
+- 응답: `station`, `station_status`(4.4절과 같음), `alternatives[]`, `count`, `search_depth`, `empty_reason`(없으면 `null`), `limitations`.
+- `alternatives[]`: `station_id`, `station_name`, `lines`, `distance`(간선 수), `same_line`(대상 역과 노선을 하나라도 공유), `station_status`.
+- 후보는 `station_edges`의 ADJACENT 간선을 BFS로 탐색한다(깊이는 `ALTERNATIVE_SEARCH_DEPTH`, 기본 2·임시). 간선이 없으면 후보도 없으며 인접·환승 관계를 추정하지 않는다.
+- 가동중 설비가 확인된 역(`AVAILABLE`, `PARTIAL`)만 후보다. 대상 역이 `AVAILABLE`이고 `data_fresh`면 후보 없이 `empty_reason`을 준다.
+- 정렬: 같은 노선 먼저, 거리, `AVAILABLE` 먼저, 신선한 데이터 먼저, `station_id`.
+- `limitations`에는 항상 "실제 접근 가능한 경로와 환승 가능 여부는 검증되지 않음"이 있다. 오류 형식은 0.6절과 같다.
+
 ---
 
 ## 9. 실제 데이터에서 확인되지 않은 항목 (미검증)

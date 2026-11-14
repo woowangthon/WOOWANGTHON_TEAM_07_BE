@@ -33,7 +33,9 @@ from app.timeutil import utc_str_to_kst_iso
 NOT_FOUND_MESSAGE = "요청한 리소스를 찾을 수 없습니다."
 
 
-def _elevator_rows(session: Session, station_id: int | None = None):
+def _elevator_rows(
+    session: Session, station_id: int | None = None, station_ids: list[int] | None = None
+):
     """설비, 역 이름, 최신 상태(없으면 None)를 한 번에 읽는다. 정렬은 station_id, elevator_id."""
     stmt = (
         select(Elevator, Station.station_name, ElevatorStatus)
@@ -43,6 +45,8 @@ def _elevator_rows(session: Session, station_id: int | None = None):
     )
     if station_id is not None:
         stmt = stmt.where(Elevator.station_id == station_id)
+    if station_ids is not None:
+        stmt = stmt.where(Elevator.station_id.in_(station_ids))
     return list(session.execute(stmt).all())
 
 
