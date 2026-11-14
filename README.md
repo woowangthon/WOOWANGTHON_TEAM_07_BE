@@ -23,6 +23,39 @@ uv run uvicorn app.main:app --reload
 
 서버가 뜨면 `GET http://127.0.0.1:8000/health`가 `{"status": "ok"}`를 응답한다.
 
+## FE/AI 로컬 연동 빠른 시작
+
+운영 DB(`data/dev.db`)를 쓰지 않고 데모 DB로 띄우는 순서다. 연동용 API 설명은 [docs/frontend-integration.md](docs/frontend-integration.md)를 본다.
+
+```bash
+# 1. 의존성 설치
+uv sync
+
+# 2. 환경 변수 (.env는 커밋하지 않는다). FE 개발 서버 주소를 CORS에 명시한다. 키는 비워도 된다.
+cp .env.example .env
+#   CORS_ALLOWED_ORIGINS=http://localhost:5173   (쉼표로 여러 개, 와일드카드 불가, 기본은 비어 있어 교차 출처 불허)
+
+# 3. 데모 DB 생성 (임시 디렉터리). 마지막 줄 근처에 출력되는 "데모 DB: <경로>/demo.db"를 복사한다
+uv run python -m app.cli.build_demo_db --include-provisional-adjacent
+
+# 4. 데모 DB로 서버 실행 (환경 변수가 .env보다 우선한다)
+DATABASE_URL=sqlite:////<위에서 출력된 경로>/demo.db uv run uvicorn app.main:app --port 8000
+
+# 5. 호출 확인 (한글 쿼리는 --data-urlencode로 보낸다)
+curl http://127.0.0.1:8000/health
+curl -G http://127.0.0.1:8000/api/stations --data-urlencode "q=서울역"
+curl http://127.0.0.1:8000/api/stations/1/elevators
+curl http://127.0.0.1:8000/api/stations/1/alternatives
+curl -X POST http://127.0.0.1:8000/api/departure-time -H "Content-Type: application/json" \
+  -d '{"arrival_at":"2026-12-01T09:00:00+09:00","travel_minutes":30}'
+curl http://127.0.0.1:8000/api/stations/1/arrivals
+```
+
+- 자동 문서: 서버 실행 후 `http://127.0.0.1:8000/docs`(Swagger UI).
+- 데모 DB의 샘플 엘리베이터는 과거 응답이라 TTL 기준 **정보 없음(STALE)** 으로 나온다. 정상 응답이다. 합성 상태 5건만 생성 시각 기준으로 잠시 확인 상태가 된다.
+- 서버 기동과 `/health` 응답은 로컬에서 확인했다. **배포 환경(호스팅, HTTPS, 영속 저장소)은 정해지지 않았고 확인하지 않았다.**
+- 외부 API(OA-15994 수집, OA-12764 실시간 도착)는 서버가 호출하지 않는다. 도착 정보는 항상 `UNCONFIRMED`다.
+
 ## 테스트
 
 ```bash
