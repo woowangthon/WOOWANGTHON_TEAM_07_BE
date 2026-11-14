@@ -72,6 +72,22 @@ uv run python -m app.cli.load_edges --apply
 - 공식 근거 없는 간선이 입력에 섞이면 DB에 손대기 전에 거부한다. 매핑 실패나 충돌은 전체 롤백, 재실행해도 중복되지 않고 기존 간선은 삭제·덮어쓰지 않는다.
 - 등급과 한계는 `data/seed/SOURCES.md`의 "역 간선"을 본다. 간선 수는 실제 거리나 무장애 이동 가능성이 아니다.
 
+## 시연용 데모 DB (임시 디렉터리, 운영 DB와 분리)
+
+```bash
+# 임시 디렉터리에 데모 SQLite를 만든다. 실제 data/dev.db는 읽기 전용으로 비교만 하고 쓰지 않는다
+uv run python -m app.cli.build_demo_db --include-provisional-adjacent
+# 출력된 demo.db로 서버 실행
+DATABASE_URL=sqlite:////tmp/elevator-demo-XXXX/demo.db uv run uvicorn app.main:app
+```
+
+- 구성: 역 240 / station_lines 276(원본과 같은 매핑) + 공식 TRANSFER 38 + (옵션) PROVISIONAL ADJACENT 239 + OA-15994 샘플 EV 866 + DEMO/SYNTHETIC 합성 상태 5.
+- `--include-provisional-adjacent`는 **데모 DB 전용 옵션**이다. 공식 인접 증명이 없는 간선이며, 운영용 `app.cli.load_edges`에는 이런 옵션이 없고 안전 제한은 그대로다. `--no-synthetic`이면 합성 상태를 넣지 않는다.
+- **샘플 엘리베이터는 과거 응답이다(2026-11-13).** 현재 상태를 보장하지 않으며, 원본에 시각이 없어 `observed_at`은 비어 있고 `fetched_at`은 파일명 날짜의 00:00:00Z(하한값, 실제 수집 시각 아님)다. TTL(기본 120분)을 우회하지 않으므로 샘플은 **STALE(정보 없음)** 으로 보인다.
+- **합성 상태는 DEMO/SYNTHETIC이다.** 실제 샘플과 별도 행이며 `source=DEMO-SYNTHETIC`, 설비명이 `[DEMO/SYNTHETIC]`로 시작한다. 생성 시각 기준이라 TTL 이후에는 STALE이 된다. 실제 상태가 아니다.
+- 출력은 임시 디렉터리만 허용한다(저장소 안, 비어 있지 않은 디렉터리는 거부). `demo_manifest.json`에 구성·한계가 기록된다.
+- 실제 `data/dev.db` 적재는 별도 승인 사항이다.
+
 ## 엘리베이터 수집 CLI (OA-15994)
 
 서울 열린데이터광장 OA-15994 응답에서 엘리베이터(EV)만 골라 `elevators`, `elevator_status`에 Upsert한다.
