@@ -7,6 +7,7 @@ from urllib.parse import urlsplit
 
 import httpx
 from fastapi import Depends, Request
+from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -16,6 +17,7 @@ from app.errors import AppError
 from app.models.accounts import AuthSession
 
 SESSION_COOKIE = "woowang_session"
+ACCOUNT_TABLES = {"users", "auth_identities", "auth_sessions", "oauth_flows", "user_favorites"}
 PROVIDERS = {
     "google": ("https://accounts.google.com/o/oauth2/v2/auth", "https://oauth2.googleapis.com/token", "https://openidconnect.googleapis.com/v1/userinfo"),
     "kakao": ("https://kauth.kakao.com/oauth/authorize", "https://kauth.kakao.com/oauth/token", "https://kapi.kakao.com/v2/user/me"),
@@ -35,8 +37,17 @@ def challenge(verifier: str) -> str:
 
 
 def validate_auth_urls() -> None:
-    for value in (settings.auth_public_base_url, settings.auth_frontend_url):
-        url = urlsplit(value)
+    for name, value in (("AUTH_PUBLIC_BASE_URL", settings.auth_public_base_url),
+                        ("AUTH_FRONTEND_URL", settings.auth_frontend_url)):
+        if any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in value):
+            raise ValueError(f"{name}에 공백·제어 문자를 넣을 수 없습니다. 주소와 포트를 확인해 주세요.")
+        try:
+            url = urlsplit(value)
+            port = url.port
+        except ValueError:
+            raise ValueError(f"{name}의 주소와 포트가 올바르지 않습니다.") from None
+        if port is not None and not 1 <= port <= 65535:
+            raise ValueError(f"{name}의 포트는 1~65535 범위여야 합니다.")
         if url.scheme not in ("http", "https") or not url.hostname or url.username or url.password or url.query:
             raise ValueError("인증 URL은 사용자 정보·쿼리가 없는 절대 HTTP(S) 주소여야 합니다.")
         if url.scheme != "https" and url.hostname not in ("127.0.0.1", "localhost", "::1"):
@@ -51,11 +62,29 @@ def validate_auth_urls() -> None:
 def credentials(provider: str) -> tuple[str, str]:
     if provider not in PROVIDERS:
         raise AppError(404, "NOT_FOUND", "지원하지 않는 로그인 제공자입니다.")
-    client_id = getattr(settings, f"{provider}_client_id")
-    secret = getattr(settings, f"{provider}_client_secret").get_secret_value()
+    client_id = getattr(settings, f"{provider}_client_id").strip()
+    secret = getattr(settings, f"{provider}_client_secret").get_secret_value().strip()
     if not client_id or (provider == "google" and not secret):
         raise AppError(503, "AUTH_NOT_CONFIGURED", "로그인 인증 키가 아직 설정되지 않았어요.")
     return client_id, secret
+
+
+def provider_configured(provider: str) -> bool:
+    try:
+        credentials(provider)
+        return True
+    except AppError:
+        return False
+
+
+def storage_ready(db: Session) -> bool:
+    # DB를 자동 변경하지 않는다. 미적용 DB에서도 로그인 준비 상태를 안전하게 알려 준다.
+    return ACCOUNT_TABLES <= set(inspect(db.connection()).get_table_names())
+
+
+def require_storage(db: Session) -> None:
+    if not storage_ready(db):
+        raise AppError(503, "AUTH_STORAGE_NOT_READY", "로그인 저장소가 아직 준비되지 않았어요. 관리자에게 확인해 주세요.")
 
 
 def callback_url(provider: str) -> str:
@@ -89,7 +118,11 @@ def exchange_identity(provider: str, code: str, verifier: str) -> tuple[str, str
                 subject = info.get("id")
                 if type(subject) is not int or subject <= 0:
                     raise ValueError("invalid subject")
-                name = (info.get("properties") or {}).get("nickname")
+                # 카카오의 프로필/닉네임 동의 설정에 따라 한쪽 필드만 올 수 있다.
+                properties = info.get("properties") or {}
+                profile = (info.get("kakao_account") or {}).get("profile") or {}
+                name = next((value for value in (properties.get("nickname"), profile.get("nickname"))
+                             if isinstance(value, str) and value.strip()), None)
             if len(str(subject)) > 255:
                 raise ValueError("invalid subject")
             return str(subject), (name.strip()[:30] if isinstance(name, str) and name.strip() else "사용자")

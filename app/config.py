@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/dev.db"
     # 빈 값을 허용한다. 키가 없어도 서버와 테스트는 뜬다(외부 호출 기능만 실패).
     seoul_open_api_key: str = ""
+    # 명시적으로 켠 단일 서버에서만 기존 CLI를 주기적으로 실행한다.
+    elevator_auto_refresh: bool = False
+    elevator_refresh_interval_minutes: int = Field(default=30, ge=1, le=60)
     # 환경 변수 ELEVATOR_STATUS_TTL_MINUTES로 바꾼다. 정수 1~1440만 허용한다.
     # 기본 120분(2시간)은 갱신 주기 미검증에 따른 임시 기본값이다.
     elevator_status_ttl_minutes: int = Field(

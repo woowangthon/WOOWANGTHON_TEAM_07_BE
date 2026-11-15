@@ -30,9 +30,17 @@
    npm.cmd run dev:auth
    ```
 
-`http://127.0.0.1:5173/#/main`에서 로그인 탭을 연다. `dev:auth`는 실제 인증을 사용하며 일반 `dev`의 데모 설정을 바꾸지 않는다. 로그인한 뒤 이름·즐겨찾기 역/장소를 저장하면 서버 DB에서 새로고침·재로그인 때 복원한다. 로그아웃은 세션만 폐기하고 즐겨찾기는 남긴다. 역 추천은 저장한 역과 확인된 역 ID만 사용한다. 역 목록이 없는 새 DB에서는 역 시드 적재가 별도로 필요하다.
+`http://127.0.0.1:5173/#/main`에서 로그인 탭을 연다. 일반 `npm.cmd run dev`와 `dev:auth` 모두 실제 인증을 사용한다. 데모 인증은 `dev:mock`으로 명시해서 실행한다. 제공자 키가 설정되어 있으면 `AUTH_FRONTEND_URL`에 지정된 정확한 Origin은 쿠키 요청에 자동 허용하며, 추가 Origin은 `CORS_ALLOWED_ORIGINS`로 지정한다. 로그인한 뒤 이름·즐겨찾기 역/장소를 저장하면 서버 DB에서 새로고침·재로그인 때 복원한다. 로그아웃은 세션만 폐기하고 즐겨찾기는 남긴다. 역 추천은 저장한 역과 확인된 역 ID만 사용한다. 역 목록이 없는 새 DB에서는 역 시드 적재가 별도로 필요하다.
 
-인증 키가 필요한 실제 제공자 로그인은 키 발급 후 확인해야 한다. 테스트는 제공자의 토큰·사용자 정보 HTTP 응답을 대체해 OAuth 흐름과 DB 저장을 검증하며 실제 Google·카카오에 접속하지 않는다.
+`GET /api/auth/providers`는 키 값을 공개하지 않고 제공자별 `configured`와 `storage_ready`만 반환한다. 키를 입력했는데 저장소가 준비되지 않았다면 DB 마이그레이션이 필요하다. 미적용 DB에서 로그인하면 500 대신 503 `AUTH_STORAGE_NOT_READY`를 반환하며 DB를 자동 변경하지 않는다. `.env` 키를 추가/변경한 뒤에는 BE 서버를 재시작한다.
+
+로그인은 유지되지만 콜백에서 `ERR_INVALID_REDIRECT`가 발생하면 로그인 후 이동 주소 `AUTH_FRONTEND_URL`을 확인한다. 로컬 기본값은 `http://127.0.0.1:5173/#/main`이다. 주소·포트 내부의 공백이나 제어 문자, 숫자가 아니거나 범위를 벗어난 포트는 서버 시작 시 거부한다. 이 값은 제공자 콘솔에 등록할 BE 콜백 URI와 구분한다. 브라우저의 콜백 주소에 붙은 일회용 `code`·`state`를 복사해 재사용하지 말고 서비스의 로그인 버튼에서 다시 시작한다.
+
+카카오 로그인은 REST API 인가 코드 → 서버 토큰 교환 → `/v2/user/me` 조회 → 계정별 세션 발급 순서다. 닉네임은 동의 설정에 따라 `properties.nickname` 또는 `kakao_account.profile.nickname`을 읽으며, 둘 다 없으면 기본 이름 `사용자`로 로그인한다. 닉네임·이메일 동의를 필수로 추가하지 않는다. Secret을 사용하는 앱은 `KAKAO_CLIENT_SECRET`도 입력한다. 카카오 콘솔에는 로그인 활성화와 `http://127.0.0.1:8000/api/auth/kakao/callback` 등록이 필요하다.
+
+실제 카카오 진입 검증은 FE/web에서 `node scripts/verify-kakao-live.mjs`로 실행한다. 새 브라우저에서 서비스의 카카오 버튼을 눌러 입력 화면 또는 표준 `KOE...` 오류만 확인하며, 키·인증 URL·쿠키·비밀번호를 출력하지 않는다. `KOE004`는 카카오 로그인 활성화, `KOE006`은 Redirect URI 설정을 확인한다. 로그인 성공 후 서비스 복귀·사용자 정보·즐겨찾기 복원은 사용자가 직접 로그인·동의한 뒤 확인한다.
+
+자동 테스트는 제공자의 토큰·사용자 정보 HTTP 응답을 대체해 OAuth 흐름과 DB 저장을 검증하며 실제 Google·카카오에 접속하지 않는다. 별도의 `FE/web/scripts/verify-google-live.mjs`와 `verify-kakao-live.mjs`로 실제 키·콜백 등록 후 두 제공자의 계정 입력 화면 진입도 확인했다. Google은 사용자 로그인 성공도 확인했다. 카카오 사용자 비밀번호·동의 입력과 인증 완료는 직접 로그인 후 확인한다. 서버는 외부 제공자와 통신할 수 있는 실행 환경에서 구동해야 한다.
 
 배포 시 `AUTH_PUBLIC_BASE_URL=https://백엔드주소`, `AUTH_FRONTEND_URL=https://프론트주소/#/main`, `AUTH_COOKIE_SECURE=true`, `CORS_ALLOWED_ORIGINS=https://프론트주소`로 설정하고 콘솔의 콜백 URI도 같은 값으로 바꾼다. FE의 `VITE_API_BASE`·`VITE_BE_BASE`에는 공개 BE 주소만 넣고 `npm.cmd run build:auth`로 빌드한다. 쿠키는 SameSite=Lax이므로 FE/BE는 같은 사이트의 HTTPS 도메인 또는 같은 Origin의 프록시로 배치한다. 서로 다른 사이트를 연결하는 쿠키 구성은 지원하지 않는다. 로컬에서도 `localhost`와 `127.0.0.1`을 섞지 않는다.
 
@@ -128,6 +136,31 @@ uv run python -m app.cli.derive_edges --apply                                   
 
 ### 서버 실행과 점검
 
+장시간 실행에는 포트·DB 버전을 먼저 점검하는 다음 명령을 권장한다.
+
+```powershell
+uv run python -m app.cli.serve --port 8000
+# 실제 외부 API 수집·DB 적재를 승인하고 자동 갱신할 경우:
+uv run python -m app.cli.serve --port 8000 --refresh-elevators
+```
+
+- 자동 갱신은 기본 OFF다. `--refresh-elevators` 또는 `.env`의 `ELEVATOR_AUTO_REFRESH=true`로 켜면 시작 직후 1회, 이후 기본 30분마다 기존 수집 CLI를 별도 프로세스로 실행한다. `SEOUL_OPEN_API_KEY`가 필요하다. `ELEVATOR_REFRESH_INTERVAL_MINUTES`(1~60)는 TTL보다 짧아야 한다. 갱신 주기와 호출 한도는 아직 미검증이다.
+- 자동 수집은 **서버 한 개에서만** 켠다. `serve`는 단일 프로세스 실행이며 reload/workers 옵션을 제공하지 않는다. 기존 uvicorn 명령에서도 환경 변수로 활성화할 수 있지만 여러 worker에서 켜면 중복 수집한다.
+- 수집 실패는 API 서버를 중단하지 않는다. 실패 후 1분, 2분, 4분 순으로 재시도 간격을 늘리고 정상 수집 주기까지만 늘린다. 5분을 넘긴 수집은 종료한다. 수집 CLI의 트랜잭션·부분 성공 규칙은 아래와 같다. 기존 데이터의 TTL을 연장하지 않으며 오래된 상태는 계속 `STALE`이다. 종료 코드 4는 DB 반영 후 로그만 실패한 경우다.
+- `GET /health`는 프로세스 생존, `GET /ready`는 DB 연결·스키마 버전과 상태 데이터의 최신/오래된 건수를 확인한다. 데이터가 없어도 또는 전부 오래돼도 `/ready`는 200이며, DB 오류·미적용 마이그레이션은 503이다. `/ready`는 외부 API를 호출하지 않는다.
+- SQLite 연결은 쓰기 잠금 해제를 최대 30초 기다린다. 장시간 잠기면 실패하며 수집기는 다음 재시도에서 복구를 시도한다. 마이그레이션과 시드 적재는 자동 실행하지 않는다. 기존 DB는 변경 전 백업한다.
+- PC가 절전·종료되거나 터미널을 닫으면 갱신도 멈춘다. PC 재개 후 이벤트 루프가 다시 실행되면 수집을 재개하지만, OS 부팅 시 자동 시작이나 서버 비정상 종료 후 재시작은 제공하지 않는다.
+
+`WinError 10048`은 DB 오류가 아니라 포트 중복 사용이다. PowerShell에서 다음과 같이 확인한다. 기존 프로세스가 이 백엔드인지 확인한 뒤 해당 터미널의 Ctrl+C로 종료하고 다시 실행한다.
+
+```powershell
+Get-NetTCPConnection -LocalPort 8000 -State Listen | Select-Object LocalAddress, LocalPort, OwningProcess
+# 위에서 확인한 PID를 숫자로 넣는다.
+Get-Process -Id <PID>
+```
+
+포트를 변경하면 FE/AI API 주소와 OAuth 콜백 주소도 함께 맞춰야 한다. `serve`는 기존 프로세스를 자동 종료하지 않으며 포트를 확보하지 못하면 DB 점검·자동 수집 전에 종료한다. DB가 준비되지 않았다면 백업 후 `uv run alembic upgrade head`를 별도로 실행한다.
+
 ```bash
 # 같은 네트워크의 FE가 접근하려면 --host 0.0.0.0. 이 PC에서만 쓰면 생략한다(기본 127.0.0.1)
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
@@ -136,7 +169,7 @@ uv run python scripts/demo_check.py     # 점검(로컬 서버만 대상)
 
 - FE가 다른 PC나 다른 포트에서 호출하면 `.env`의 `CORS_ALLOWED_ORIGINS`에 그 Origin(예: `http://192.168.0.10:5173`)을 넣고 서버를 다시 시작한다.
 - 방화벽에서 포트 8000을 열어야 같은 네트워크의 다른 PC가 접근한다. 역·경로 API는 공개 읽기 API이며, 외부 인터넷 배포는 HTTPS·접근 제어 등 배포 조건을 갖춘 뒤 진행한다. 실제 로그인은 위 OAuth 설정을 따른다.
-- 수집 데이터는 자동으로 갱신되지 않는다. 시연 직전에 `collect_elevators --apply`를 다시 실행한다(서버를 멈출 필요는 없지만 쓰는 순간 잠깐 잠길 수 있다).
+- 자동 갱신을 켜지 않았다면 시연 직전에 `collect_elevators --apply`를 다시 실행한다(서버를 멈출 필요는 없지만 쓰는 순간 잠깐 잠길 수 있다).
 - 시간표와 인접 간선은 자주 바뀌지 않으므로 한 번만 준비하면 된다.
 
 ### 시연 전 점검 목록
@@ -219,6 +252,8 @@ DATABASE_URL=sqlite:////tmp/elevator-demo-XXXX/demo.db uv run uvicorn app.main:a
 
 **결정(2026-11-14): MVP에서는 수동 CLI로 실행한다.**
 
+2026-11-15 추가: 장시간 실행을 위해 위 `app.cli.serve --refresh-elevators`가 기존 CLI를 정기 실행하는 선택 기능을 추가했다. 기본은 수동이며 실제 수집 활성화는 운영자가 명시한다. GitHub Actions의 임시 DB를 갱신하는 방식과 달리 서버 PC의 DB에 적용한다.
+
 | 옵션 | 선택 여부 | 근거 |
 |---|---|---|
 | 수동 CLI | **선택** | 단순하고, 시연 PC에서 터미널로 직접 실행한다. 자동화 전에 1회 수동 검증이 필요하다 |
@@ -296,6 +331,6 @@ uv run python -m app.cli.collect_elevators \
 ### 주의
 
 - 이 함수는 세션의 트랜잭션 전체를 커밋하거나 롤백한다. 다른 작업과 같은 세션을 쓰지 않는다(`app/services/elevator_ingest.py` 문서 참고).
-- SQLite는 쓰기 잠금이 하나뿐이라 다른 프로세스가 쓰는 중이면 `database is locked`로 실패하고 전체가 롤백된다. 자동 재시도는 하지 않는다.
+- SQLite는 쓰기 잠금이 하나뿐이라 다른 프로세스가 쓰는 중이면 최대 30초 기다리고 `database is locked`로 실패하면 전체가 롤백된다. 일회성 CLI 자체는 자동 재시도하지 않는다. 선택형 자동 수집기는 실패한 CLI를 백오프 후 다시 실행한다.
 - Alembic은 같은 프로세스에서 기존 로거를 꺼 버린다. 이 명령은 로깅 설정을 바꾸지 않고 출력은 `print`로 하며, 마이그레이션과 같은 프로세스에서 실행하지 않는다.
 - `elevators.station_line_id`는 없다. 설비의 노선은 `elevators.external_station_code`로 `station_external_ids`(source=`OA-15994`)를 조인해 얻는다.

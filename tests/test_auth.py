@@ -33,7 +33,7 @@ def oauth(monkeypatch):
             return httpx.Response(200, json={"access_token": "synthetic-access-token"})
         assert request.headers["authorization"] == "Bearer synthetic-access-token"
         if request.url.host == "kapi.kakao.com":
-            return httpx.Response(200, json={"id": 123, "properties": {"nickname": "카카오 사용자"}})
+            return httpx.Response(200, json=state.get("kakao_profile", {"id": 123, "properties": {"nickname": "카카오 사용자"}}))
         return httpx.Response(200, json={"sub": state["subject"], "name": "구글 사용자"})
 
     monkeypatch.setattr(auth.httpx, "Client", lambda **options: original(transport=httpx.MockTransport(handle), **options))
@@ -124,6 +124,33 @@ def test_unconfigured_or_unknown_provider(client, monkeypatch):
     assert client.get("/api/auth/me").status_code == 401
 
 
+def test_provider_readiness_has_only_flags_not_credentials(client, oauth):
+    response = client.get('/api/auth/providers')
+    assert response.status_code == 200
+    assert response.json() == {'providers': {'google': {'configured': True}, 'kakao': {'configured': True}},
+                               'storage_ready': True, 'limitations': []}
+    assert 'test-secret' not in response.text and 'test-google' not in response.text
+    assert response.headers['cache-control'] == 'no-store'
+
+
+def test_unmigrated_database_returns_actionable_error_without_writes(tmp_path, oauth):
+    from app.database import get_session, make_engine
+    from app.main import create_app
+    from sqlalchemy.orm import Session
+    from sqlalchemy import inspect
+    engine = make_engine(f'sqlite:///{tmp_path / "unmigrated.db"}')
+    app = create_app()
+    with Session(engine) as db:
+        app.dependency_overrides[get_session] = lambda: db
+        browser = TestClient(app)
+        assert browser.get('/api/auth/providers').json()['storage_ready'] is False
+        response = browser.get('/api/auth/google/login', follow_redirects=False)
+        assert response.status_code == 503
+        assert response.json()['error']['code'] == 'AUTH_STORAGE_NOT_READY'
+        assert inspect(engine).get_table_names() == []
+    engine.dispose()
+
+
 def test_profile_favorites_persist_after_logout_and_relogin(client, db, oauth):
     me = sign_in(client)
     headers = mutation_headers(me)
@@ -185,6 +212,42 @@ def test_favorite_validation_and_missing_station(client, oauth):
     assert client.post("/api/me/favorites", json={"place_name": "없는 역", "station_id": 99999}, headers=mutation_headers(me)).status_code == 404
 
 
+@pytest.mark.parametrize('profile, expected', [
+    ({'id': 123, 'properties': {'nickname': '카카오 이름'}}, '카카오 이름'),
+    ({'id': 123, 'kakao_account': {'profile': {'nickname': '동의한 이름'}}}, '동의한 이름'),
+    ({'id': 123, 'properties': {'nickname': ' '}, 'kakao_account': {'profile': {'nickname': '프로필 이름'}}}, '프로필 이름'),
+    ({'id': 123}, '사용자'),
+])
+def test_kakao_profile_consent_variants(client, oauth, profile, expected):
+    oauth['kakao_profile'] = profile
+    me = sign_in(client, 'kakao')
+    assert me['name'] == expected
+    assert me['provider'] == 'kakao'
+
+
+def test_kakao_authorize_and_optional_secret(client, monkeypatch, oauth):
+    monkeypatch.setattr(settings, 'kakao_client_secret', SecretStr(''))
+    params = start(client, 'kakao')
+    assert params['redirect_uri'] == ['http://127.0.0.1:8000/api/auth/kakao/callback']
+    assert 'code_challenge' not in params
+    assert 'scope' not in params  # 앱에 등록하지 않은 동의 항목을 강제로 요구하지 않는다.
+    response = client.get('/api/auth/kakao/callback', params={'state': params['state'][0], 'code': 'test-code'}, follow_redirects=False)
+    assert response.status_code == 303 and 'auth_error' not in response.headers['location']
+    form = parse_qs(oauth['requests'][0].content.decode())
+    assert 'client_secret' not in form
+    assert 'code_verifier' not in form
+    assert oauth['requests'][1].url.host == 'kapi.kakao.com'
+
+
+@pytest.mark.parametrize('subject', [None, True, 'untrusted-string-id', -1])
+def test_kakao_invalid_identity_cannot_create_account(client, db, oauth, subject):
+    oauth['kakao_profile'] = {'id': subject}
+    params = start(client, 'kakao')
+    response = client.get('/api/auth/kakao/callback', params={'state': params['state'][0], 'code': 'test-code'}, follow_redirects=False)
+    assert 'provider_failed' in response.headers['location']
+    assert db.scalar(select(User)) is None
+
+
 def test_deployment_urls_require_https_secure_cookie(monkeypatch):
     monkeypatch.setattr(settings, "auth_public_base_url", "http://example.com")
     with pytest.raises(ValueError):
@@ -193,3 +256,26 @@ def test_deployment_urls_require_https_secure_cookie(monkeypatch):
     monkeypatch.setattr(settings, "auth_cookie_secure", False)
     with pytest.raises(ValueError):
         auth.validate_auth_urls()
+
+
+@pytest.mark.parametrize('field', ['auth_frontend_url', 'auth_public_base_url'])
+@pytest.mark.parametrize('invalid', [
+    'http://127.0.0.1:5    173', 'http://127.0.0.1:abc',
+    'http://127.0.0.1:65536', 'http://127.0.0.1:0',
+    'http://127.0.0.1:5\t173', 'http://127.0.0.1:5173\r\n',
+])
+def test_auth_rejects_invalid_redirect_configuration(monkeypatch, field, invalid):
+    monkeypatch.setattr(settings, field, invalid)
+    with pytest.raises(ValueError, match='AUTH_'):
+        auth.validate_auth_urls()
+
+
+@pytest.mark.parametrize('provider', ['google', 'kakao'])
+def test_success_callback_has_valid_frontend_location_and_session_cookie(client, oauth, provider):
+    params = start(client, provider)
+    response = client.get(f'/api/auth/{provider}/callback',
+                          params={'state': params['state'][0], 'code': 'test-code'}, follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers.get_list('location') == [ORIGIN + '/#/main']
+    assert 'woowang_session' in client.cookies
+    assert client.get('/api/auth/me').status_code == 200

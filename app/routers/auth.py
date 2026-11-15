@@ -18,6 +18,7 @@ from app.models.accounts import AuthIdentity, AuthSession, OAuthFlow, User, User
 from app.services.auth import (
     PROVIDERS, SESSION_COOKIE, callback_url, challenge, cookie_options, credentials,
     current_session, digest, exchange_identity, mutation_session, utc_after,
+    provider_configured, require_storage, storage_ready,
 )
 
 router = APIRouter(prefix="/api", tags=["accounts"])
@@ -35,9 +36,17 @@ def frontend_redirect(error: str | None = None):
     return response
 
 
+@router.get("/auth/providers")
+def providers(response: Response, db: Session = Depends(get_session)):
+    no_store(response)
+    return {"providers": {provider: {"configured": provider_configured(provider)} for provider in PROVIDERS},
+            "storage_ready": storage_ready(db), "limitations": []}
+
+
 @router.get("/auth/{provider}/login")
 def login(provider: str, db: Session = Depends(get_session)):
     client_id, _ = credentials(provider)
+    require_storage(db)
     state, browser, verifier = secrets.token_urlsafe(32), secrets.token_urlsafe(32), secrets.token_urlsafe(64)
     db.execute(delete(OAuthFlow).where(OAuthFlow.expires_at <= utc_after()))
     db.execute(delete(AuthSession).where(AuthSession.expires_at <= utc_after()))
@@ -46,7 +55,7 @@ def login(provider: str, db: Session = Depends(get_session)):
     db.commit()
     params = {"response_type": "code", "client_id": client_id, "redirect_uri": callback_url(provider), "state": state}
     if provider == "google":
-        params.update(scope="openid profile", code_challenge=challenge(verifier), code_challenge_method="S256")
+        params.update(scope="openid profile", code_challenge=challenge(verifier), code_challenge_method="S256", prompt="select_account")
     response = RedirectResponse(PROVIDERS[provider][0] + "?" + urlencode(params), 302)
     response.set_cookie(f"woowang_oauth_{provider}", browser, max_age=600, **cookie_options())
     no_store(response)
@@ -56,6 +65,7 @@ def login(provider: str, db: Session = Depends(get_session)):
 @router.get("/auth/{provider}/callback")
 def callback(provider: str, request: Request, db: Session = Depends(get_session)):
     credentials(provider)
+    require_storage(db)
     state = request.query_params.get("state", "")
     browser = request.cookies.get(f"woowang_oauth_{provider}", "")
     # DELETE RETURNING으로 같은 state를 동시에 두 번 소비할 수 없게 한다.
