@@ -9,6 +9,14 @@
 
 ## 0. 공통 규칙
 
+### 운영 점검 API 추가 (2026-11-15)
+
+`GET /health`의 기존 `{ "status": "ok" }` 응답은 유지한다. DB와 외부 API를 검사하지 않는다.
+
+`GET /ready`는 DB 연결·필수 테이블·Alembic head 일치를 검사한다. 준비된 경우 200: `{ "status": "ready", "database": "ok", "elevator_status": { "total": 866, "fresh": 0, "stale": 866, "latest_fetched_at": "2026-11-15T00:24:38+09:00" } }`. 숫자는 예시다. 수집 현황의 `latest_fetched_at`은 DB의 수집 시각을 KST로 변환한 값(상태의 관측 시각 아님)이며 상태가 없으면 null이다. `fresh`는 설정 TTL 이내 상태 행 수, `stale`은 나머지다. 상태 행이 없거나 오래돼도 안전하게 정보 없음을 응답할 수 있으므로 200이다. 이 응답은 데이터 수집의 성공이나 모든 역의 데이터 확보를 보장하지 않는다.
+
+DB 연결 실패·필수 테이블 누락·버전 불일치는 503이며 공통 오류 형식의 `DATABASE_NOT_READY`를 쓴다. DB 주소·키·드라이버 오류 원문은 공개하지 않는다. 기존 FE/AI 업무 응답에는 변경이 없다.
+
 ### 계정 API 추가 (2026-11-15)
 
 Google·카카오 OAuth와 서버 저장 즐겨찾기를 추가했다. 기존 역·경로·AI 응답 계약은 유지한다. 인증 라우터는 제공자의 인가 코드를 서버에서 토큰으로 교환하고 사용자 정보 API를 조회하는 예외이며, 공공데이터 수집은 기존 CLI 방식이다. 실제 제공자 키를 사용한 검증은 키 발급 후 수행해야 한다.
@@ -30,6 +38,7 @@ Google·카카오 OAuth와 서버 저장 즐겨찾기를 추가했다. 기존 �
 - 세션 원본은 HttpOnly·SameSite=Lax·Path=/ 쿠키 `woowang_session`에만 발급한다. DB에는 SHA-256 해시만 저장한다. 기본 만료 7일, 로그인 때 기존 브라우저 세션을 폐기한다. Google과 카카오는 이메일 기준으로 자동 병합하지 않는다. 제공자 토큰·이메일은 저장하지 않는다.
 - 변경 요청은 `credentials: include`, 명시적으로 허용된 `Origin`, `/auth/me`에서 받은 `X-CSRF-Token`이 필요하다. 누락/불일치는 403 `CSRF_FAILED`. 사용자 ID를 본문으로 받지 않는다. 다른 사용자 항목은 수정/삭제 404다.
 - station_id가 있으면 서버 역명으로 place_name을 정규화한다. 없는 역 404, 같은 사용자의 중복 역 409 `DUPLICATE_FAVORITE`. station_id가 null인 일반 장소는 유지하고 주변 역을 추측하지 않는다.
+- 카카오 계정은 `/v2/user/me`의 양의 정수 `id`로 식별한다. 닉네임은 `properties.nickname` → `kakao_account.profile.nickname` 순서의 공백이 아닌 문자열을 사용하며, 동의하지 않아 값이 없으면 `사용자`로 생성한다. 이메일·프로필 동의를 강제로 요구하지 않는다. 카카오 토큰 요청에는 설정된 경우만 Client Secret을 포함하고 Google PKCE 필드는 보내지 않는다.
 - 계정 응답과 오류는 `Cache-Control: no-store`, `Referrer-Policy: no-referrer`. 콜백 실패는 FE 쿼리 `auth_error=invalid_state|cancelled|provider_failed`로 전달하며 제공자 원문 오류·키·코드는 전달하지 않는다. 204는 본문이 없다.
 - 만료 flow/세션은 새 로그인 시작 때 정리한다. 세션은 요청 때도 만료를 검사한다. OAuth 제공자 HTTP 호출은 10초 timeout, HTTPS 고정 URL, 리다이렉트 미추적이다.
 - 설정·실행·콜백 등록은 [README 로그인 준비](../README.md#google카카오-로그인-준비). HTTPS 배포에서 `AUTH_COOKIE_SECURE=true`가 필요하며, FE/BE는 쿠키를 쓸 수 있는 같은 사이트로 배치한다.

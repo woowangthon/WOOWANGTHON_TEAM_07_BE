@@ -39,11 +39,15 @@
 | `CORS_ALLOWED_ORIGINS` | FE가 브라우저로 호출하면 예 | FE Origin을 쉼표로 명시. 기본은 빈 값(교차 출처 불허). 와일드카드 불가 |
 | `SEOUL_OPEN_API_KEY` | 수집을 쓸 때만 | 서버 실행에는 불필요. 값을 저장소·로그·채팅에 남기지 않는다 |
 | `ELEVATOR_STATUS_TTL_MINUTES` | 아니오 | 기본 120(임시) |
+| `ELEVATOR_AUTO_REFRESH` | 아니오 | 기본 false. true는 실제 수집 CLI의 정기 적재 활성화. 단일 서버에서만 설정 |
+| `ELEVATOR_REFRESH_INTERVAL_MINUTES` | 아니오 | 기본 30, 1~60. 자동 수집 활성화 시 TTL보다 짧아야 함. 실패 재시도는 1분부터 지수 백오프 |
 | `ARRIVAL_CACHE_TTL_SECONDS` | 아니오 | 기본 30 |
 | `ALTERNATIVE_SEARCH_DEPTH`, `WALK_TO_STATION_MINUTES`, `STATION_ENTRY_MINUTES`, `EXIT_WALK_MINUTES`, `ROUTE_SEGMENT_MINUTES`(2), `ROUTE_TRANSFER_MINUTES`(5) | 아니오 | 검증되지 않은 추정 기본값 |
 
 - `.env`는 저장소에 올리지 않는다(`.gitignore`). 호스팅의 환경 변수 설정 기능으로 주입하는 방식을 권한다.
 - 환경 변수가 `.env`보다 우선한다.
+
+장시간 실행 권장 명령은 `uv run python -m app.cli.serve --port 8000`이다. 포트 확보와 DB 스키마 점검 후 실행하며, `--refresh-elevators`를 명시하면 시작 직후와 이후 주기적으로 별도 CLI 프로세스를 실행한다. 외부 수집은 요청 처리 중 실행하지 않는다. 성공 여부는 수집기 로그와 `GET /ready`의 최신/오래된 건수로 확인한다. `/health`는 기존처럼 DB와 무관한 생존 점검이다. 자동 수집은 수동 CLI를 정기 실행하는 선택 기능이며 실제 API 호출·DB 적재는 운영자가 활성화한다. SQLite 쓰기 잠금은 최대 30초 기다린다. 실제 서버에서 자동 수집·절전 복귀는 아직 검증하지 않았다.
 
 ## 5. 팀이 결정해야 할 사항
 

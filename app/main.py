@@ -9,11 +9,12 @@ from app.errors import register_exception_handlers
 from app.routers import alternatives, arrivals, departure_time, elevators, health, routes, stations
 from app.routers import auth
 from app.services.auth import provider_configured, validate_auth_urls
+from app.services.elevator_refresh import lifespan
 
 
 def create_app() -> FastAPI:
     validate_auth_urls()
-    app = FastAPI(title="WOOWANGTHON Backend", version="0.1.0")
+    app = FastAPI(title="WOOWANGTHON Backend", version="0.1.0", lifespan=lifespan)
     register_exception_handlers(app)
     @app.middleware("http")
     async def private_account_responses(request, call_next):

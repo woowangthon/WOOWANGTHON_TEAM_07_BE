@@ -21,7 +21,9 @@ def make_engine(url: str) -> Engine:
     is_sqlite = url.startswith("sqlite")
     engine = create_engine(
         url,
-        connect_args={"check_same_thread": False} if is_sqlite else {},
+        # 수집과 계정 저장이 잠깐 겹치면 즉시 실패하지 않고 최대 30초 기다린다.
+        connect_args={"check_same_thread": False, "timeout": 30} if is_sqlite else {},
+        pool_pre_ping=True,
     )
     if is_sqlite:
         event.listen(engine, "connect", _enable_sqlite_fk)
